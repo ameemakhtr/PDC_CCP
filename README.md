@@ -1,11 +1,11 @@
 # CS-428: Parallel and Distributed Computing (PDC)
 ## Complex Computing Problem (CCP) — All-Pairs Shortest Path Optimization
 
-[![Language](https://img.shields.io/badge/Language-C11-blue.svg)](https://en.wikipedia.org/wiki/C11_(C_standard_revision))
+[![Language](https://img.shields.io/badge/Language-C11-blue.svg)](https://en.wikipedia.org/wiki/C11_%28C_standard_revision%29)
 [![Framework](https://img.shields.io/badge/Parallelism-OpenMP-orange.svg)](https://www.openmp.org/)
 [![Compiler](https://img.shields.io/badge/Compiler-GCC%2016.1.0%20%7C%20OpenMP-green.svg)](https://gcc.gnu.org/)
 [![University](https://img.shields.io/badge/NED%20University-CIS%20Department-red.svg)](https://www.neduet.edu.pk/)
-[![Batch](https://img.shields.io/badge/Batch-2023-purple.svg)]()
+![Batch](https://img.shields.io/badge/Batch-2023-purple.svg)
 
 This repository contains the complete implementation, benchmark suite, and technical report for the **Complex Computing Problem (CCP)** in **CS-428: Parallel and Distributed Computing** at the **Department of Computer & Information Systems Engineering, NED University of Engineering & Technology, Karachi**.
 
