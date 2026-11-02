@@ -3,7 +3,7 @@
 
 [![Language](https://img.shields.io/badge/Language-C11-blue.svg)](https://en.wikipedia.org/wiki/C11_(C_standard_revision))
 [![Framework](https://img.shields.io/badge/Parallelism-OpenMP-orange.svg)](https://www.openmp.org/)
-[![Compiler](https://img.shields.io/badge/Compiler-GCC%2016.1.0%20(-O3%20-fopenmp)-green.svg)](https://gcc.gnu.org/)
+[![Compiler](https://img.shields.io/badge/Compiler-GCC%2016.1.0%20%7C%20OpenMP-green.svg)](https://gcc.gnu.org/)
 [![University](https://img.shields.io/badge/NED%20University-CIS%20Department-red.svg)](https://www.neduet.edu.pk/)
 [![Batch](https://img.shields.io/badge/Batch-2023-purple.svg)]()
 
@@ -28,7 +28,7 @@ This project investigates the multi-core parallelization and memory hierarchy op
 
 In modern cyber defense, rapid all-pairs shortest path computation is critical for:
 - **Attack Graph Analysis & Reachability:** Enterprise network assets (workstations, DMZ proxies, Active Directory Domain Controllers) are mapped as vertices. Edges represent exploitable communication channels with weights mapped via CVSS v3.1 metrics:
-  $$W(u, v) = 10 - \text{CVSS\_Exploitability}$$
+  $$W(u, v) = 10 - \text{CVSS}_{\text{Exploitability}}$$
   The parallel solver computes the **Minimum-Effort Attack Trajectory** from perimeter phished hosts to domain root credentials in milliseconds.
 - **Blast Radius Containment:** Instant identification of all assets reachable within a risk threshold $R \le R_{max}$ to automate emergency firewall micro-segmentation during active ransomware outbreaks.
 - **Zero-Trust Network Optimization:** Centrality calculations identify pivotal choke point routers where IPS and EDR inspection must be prioritized.
