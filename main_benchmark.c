@@ -199,7 +199,10 @@ int main(int argc, char *argv[]) {
         floyd_warshall_sequential(work_graph, n);
         double t_seq = omp_get_wtime() - t_seq_start;
 
-        printf("%-8d %-20s %-8d %-15.4f %-10.2fx %-11.1f%%\n", n, "Sequential", 1, t_seq, 1.0, 100.0);
+        char sp_buf[16], eff_buf[16];
+        snprintf(sp_buf, sizeof(sp_buf), "%.2fx", 1.0);
+        snprintf(eff_buf, sizeof(eff_buf), "%.1f%%", 100.0);
+        printf("%-8d %-20s %-8d %-15.4f %-10s %-11s\n", n, "Sequential", 1, t_seq, sp_buf, eff_buf);
         fprintf(f_csv, "%d,Sequential,1,%.5f,1.0000,100.00\n", n, t_seq);
 
         // Standard OpenMP Parallel for threads 1, 2, 4, 8
@@ -212,7 +215,9 @@ int main(int argc, char *argv[]) {
             double speedup = t_seq / t_par;
             double efficiency = (speedup / th) * 100.0;
 
-            printf("%-8d %-20s %-8d %-15.4f %-10.2fx %-11.1f%%\n", n, "OpenMP-Standard", th, t_par, speedup, efficiency);
+            snprintf(sp_buf, sizeof(sp_buf), "%.2fx", speedup);
+            snprintf(eff_buf, sizeof(eff_buf), "%.1f%%", efficiency);
+            printf("%-8d %-20s %-8d %-15.4f %-10s %-11s\n", n, "OpenMP-Standard", th, t_par, sp_buf, eff_buf);
             fprintf(f_csv, "%d,OpenMP-Standard,%d,%.5f,%.4f,%.2f\n", n, th, t_par, speedup, efficiency);
         }
 
@@ -226,7 +231,9 @@ int main(int argc, char *argv[]) {
             double speedup = t_seq / t_blk;
             double efficiency = (speedup / th) * 100.0;
 
-            printf("%-8d %-20s %-8d %-15.4f %-10.2fx %-11.1f%%\n", n, "OpenMP-Blocked", th, t_blk, speedup, efficiency);
+            snprintf(sp_buf, sizeof(sp_buf), "%.2fx", speedup);
+            snprintf(eff_buf, sizeof(eff_buf), "%.1f%%", efficiency);
+            printf("%-8d %-20s %-8d %-15.4f %-10s %-11s\n", n, "OpenMP-Blocked", th, t_blk, sp_buf, eff_buf);
             fprintf(f_csv, "%d,OpenMP-Blocked,%d,%.5f,%.4f,%.2f\n", n, th, t_blk, speedup, efficiency);
         }
         printf("------------------------------------------------------------------------------\n");
