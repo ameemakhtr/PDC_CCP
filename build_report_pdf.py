@@ -170,8 +170,9 @@ def generate_pdf():
     story.append(Spacer(1, 22))
 
     # NED Logo
-    if os.path.exists("ned_logo_1.png"):
-        story.append(RLImage("ned_logo_1.png", width=2.0*inch, height=2.0*inch))
+    logo_path = 'ned_logo.png' if os.path.exists('ned_logo.png') else 'ned_logo_1.png'
+    if os.path.exists(logo_path):
+        story.append(RLImage(logo_path, width=2.0*inch, height=2.0*inch))
     story.append(Spacer(1, 22))
 
     story.append(Paragraph("Group Members:", subtitle_style))

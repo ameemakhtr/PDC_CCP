@@ -111,12 +111,13 @@ def create_docx_report():
     run_batch.font.size = Pt(12)
 
     # Logo
-    if os.path.exists('ned_logo_1.png'):
+    logo_path = 'ned_logo.png' if os.path.exists('ned_logo.png') else 'ned_logo_1.png'
+    if os.path.exists(logo_path):
         p_logo = doc.add_paragraph()
         p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_logo.paragraph_format.space_after = Pt(24)
         run_logo = p_logo.add_run()
-        run_logo.add_picture('ned_logo_1.png', width=Inches(2.0))
+        run_logo.add_picture(logo_path, width=Inches(2.0))
 
     # Group Members
     p_gm = doc.add_paragraph()

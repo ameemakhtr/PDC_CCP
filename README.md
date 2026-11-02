@@ -149,7 +149,7 @@ python build_report_pdf.py
 | :---: | :--- | :---: | :---: |
 | 1 | **Ameem Akhtar** | CR-23013 | [@ameemakhtr](https://github.com/ameemakhtr) |
 | 2 | **Minhal Rizvi** | CR-23017 | [@Minhal128](https://github.com/Minhal128) |
-| 3 | **Muhammad Usman** | CR-23038 | — |
+| 3 | **Muhammad Usman** | CR-23038 | [@Daedalus46](https://github.com/Daedalus46) |
 | 4 | **Maaz Wasim** | CR-23041 | [@maazw](https://github.com/maazw) |
 
 ---
