@@ -12,6 +12,7 @@
 
 #define INF 1000000000
 #define BLOCK_SIZE 64
+#define RUNS 3   // every timing is the median of RUNS runs
 
 // Initialize graph with random weights and given edge density
 void initialize_graph(int *matrix, int n, double density, unsigned int seed) {
@@ -130,6 +131,157 @@ int verify_results(const int *m1, const int *m2, int n) {
     return 1; // Exactly identical
 }
 
+// Run one implementation in place: 0 = Sequential, 1 = OpenMP-Standard, 2 = OpenMP-Blocked
+void run_algo(int algo, int *dist, int n, int threads, int bsize) {
+    if (algo == 0) floyd_warshall_sequential(dist, n);
+    else if (algo == 1) floyd_warshall_parallel(dist, n, threads);
+    else floyd_warshall_blocked(dist, n, threads, bsize);
+}
+
+// Independent oracle (different algorithm): Bellman-Ford from every source vertex.
+// ponytail: slow, only used on the small correctness-test graphs
+void apsp_bellman_ford(const int *g, int *d, int n) {
+    for (int s = 0; s < n; s++) {
+        int *ds = d + s * n;
+        for (int v = 0; v < n; v++) ds[v] = (v == s) ? 0 : INF;
+        int changed = 1;
+        while (changed) {
+            changed = 0;
+            for (int u = 0; u < n; u++) {
+                if (ds[u] == INF) continue;
+                for (int v = 0; v < n; v++) {
+                    int w = g[u * n + v];
+                    if (w != INF && ds[u] + w < ds[v]) {
+                        ds[v] = ds[u] + w;
+                        changed = 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Check every implementation, thread count and block size against the oracle.
+// Sizes cover 1 vertex, below / equal / above one block, and non-multiples of B.
+void run_correctness_tests(void) {
+    int sizes[] = {1, 2, 17, 63, 64, 65, 130, 300};
+    double densities[] = {0.02, 0.40, 1.00};
+    int threads[] = {1, 2, 4, 8};
+    int blocks[] = {16, 64, 128};
+    int max_n = 300, tests = 0;
+    size_t bytes = (size_t)max_n * max_n * sizeof(int);
+    int *g = malloc(bytes), *ref = malloc(bytes), *out = malloc(bytes);
+
+    for (int si = 0; si < 8; si++)
+    for (int di = 0; di < 3; di++)
+    for (unsigned int seed = 1; seed <= 3; seed++) {
+        int n = sizes[si];
+        initialize_graph(g, n, densities[di], seed);
+        apsp_bellman_ford(g, ref, n);
+
+        for (int algo = 0; algo < 3; algo++)
+        for (int t = 0; t < 4; t++) {
+            if (algo == 0 && t > 0) break;      // sequential has no thread count
+            for (int b = 0; b < 3; b++) {
+                if (algo != 2 && b > 0) break;  // only the blocked version uses B
+                memcpy(out, g, (size_t)n * n * sizeof(int));
+                run_algo(algo, out, n, threads[t], blocks[b]);
+                tests++;
+                if (!verify_results(ref, out, n)) {
+                    printf("  [FAIL] algo=%d n=%d density=%.2f seed=%u threads=%d B=%d\n",
+                           algo, n, densities[di], seed, threads[t], blocks[b]);
+                    exit(1); // ponytail: process ends here, OS frees memory
+                }
+            }
+        }
+    }
+    printf("  [PASS] %d/%d runs match the independent Bellman-Ford oracle exactly\n\n", tests, tests);
+    free(g); free(ref); free(out);
+}
+
+// Cybersecurity demo: minimum-effort attack path on a small enterprise network.
+// Edge weight = attacker effort to pivot u -> v (lower = easier, e.g. 10 - CVSS exploitability).
+#define NODES 8
+int attack_path_demo(void) {
+    const char *name[NODES] = {"Phished-PC", "Web-DMZ", "VPN-Gateway", "HR-Workstation",
+                               "File-Server", "SQL-Database", "Jump-Host", "Domain-Controller"};
+    int edges[][3] = {          // {from, to, effort}
+        {0, 3, 2},              // Phished-PC     -> HR-Workstation (reused password)
+        {0, 1, 6},              // Phished-PC     -> Web-DMZ
+        {1, 5, 3},              // Web-DMZ        -> SQL-Database   (SQL injection)
+        {2, 6, 4},              // VPN-Gateway    -> Jump-Host
+        {3, 4, 3},              // HR-Workstation -> File-Server    (open SMB share)
+        {3, 7, 12},             // HR-Workstation -> Domain-Controller (hard, direct)
+        {4, 6, 2},              // File-Server    -> Jump-Host      (stored RDP creds)
+        {5, 7, 9},              // SQL-Database   -> Domain-Controller
+        {6, 7, 4},              // Jump-Host      -> Domain-Controller (admin session)
+    };
+    int g[NODES * NODES], d[NODES * NODES];
+    for (int i = 0; i < NODES * NODES; i++) g[i] = (i / NODES == i % NODES) ? 0 : INF;
+    for (int e = 0; e < 9; e++) g[edges[e][0] * NODES + edges[e][1]] = edges[e][2];
+    memcpy(d, g, sizeof(g));
+    floyd_warshall_parallel(d, NODES, 4);
+
+    int src = 0, dst = 7, hops = 0, u = src;
+    printf("  Minimum-effort attack path (effort %d):\n    %s", d[src * NODES + dst], name[u]);
+    while (u != dst) {  // next hop v satisfies w(u,v) + dist(v,dst) == dist(u,dst)
+        for (int v = 0; v < NODES; v++) {
+            int w = g[u * NODES + v];
+            if (v != u && w != INF && d[v * NODES + dst] != INF &&
+                w + d[v * NODES + dst] == d[u * NODES + dst]) { u = v; break; }
+        }
+        printf(" -> %s", name[u]);
+        hops++;
+    }
+    printf("\n  Blast radius from %s (effort <= 7):", name[src]);
+    for (int v = 0; v < NODES; v++)
+        if (v != src && d[src * NODES + v] <= 7) printf(" %s(%d)", name[v], d[src * NODES + v]);
+    printf("\n");
+
+    // Self-check against the hand-computed answer: 2 + 3 + 2 + 4 = 11 over 4 hops,
+    // and VPN-Gateway has no incoming edge so it must stay unreachable.
+    if (d[src * NODES + dst] != 11 || hops != 4 || d[src * NODES + 2] != INF) {
+        printf("  [FAIL] attack-path demo gave a wrong answer\n");
+        return 0;
+    }
+    printf("  [PASS] matches hand-computed answer\n\n");
+    return 1;
+}
+
+static int cmp_double(const void *a, const void *b) {
+    double x = *(const double *)a, y = *(const double *)b;
+    return (x > y) - (x < y);
+}
+
+// Median wall time of RUNS runs, each on a fresh copy of the graph.
+// If ref is given, every run's result must equal it (no fast-but-wrong timings).
+double time_algo(int algo, const int *base, int *work, const int *ref, int n, int threads, int bsize) {
+    double t[RUNS];
+    for (int r = 0; r < RUNS; r++) {
+        memcpy(work, base, (size_t)n * n * sizeof(int));
+        double start = omp_get_wtime();
+        run_algo(algo, work, n, threads, bsize);
+        t[r] = omp_get_wtime() - start;
+        if (ref && !verify_results(ref, work, n)) {
+            printf("  [FAIL] wrong result: algo=%d n=%d threads=%d B=%d\n", algo, n, threads, bsize);
+            exit(1);
+        }
+    }
+    qsort(t, RUNS, sizeof(double), cmp_double);
+    return t[RUNS / 2];
+}
+
+// Print one result row and append it to the CSV
+void report_row(FILE *csv, int n, const char *name, int th, double t, double t_seq) {
+    double speedup = t_seq / t;
+    double efficiency = (speedup / th) * 100.0;
+    char sp_buf[16], eff_buf[16];
+    snprintf(sp_buf, sizeof(sp_buf), "%.2fx", speedup);
+    snprintf(eff_buf, sizeof(eff_buf), "%.1f%%", efficiency);
+    printf("%-8d %-20s %-8d %-15.4f %-10s %-11s\n", n, name, th, t, sp_buf, eff_buf);
+    fprintf(csv, "%d,%s,%d,%.5f,%.4f,%.2f\n", n, name, th, t, speedup, efficiency);
+}
+
 int main(int argc, char *argv[]) {
     printf("======================================================================\n");
     printf("  NED University of Engineering & Technology - CIS Department\n");
@@ -138,111 +290,66 @@ int main(int argc, char *argv[]) {
     printf("            Muhammad Usman (CR-23038), Maaz Wasim (CR-23041)\n");
     printf("======================================================================\n\n");
 
-    // Correctness verification check on V=300
-    int test_n = 300;
-    int *orig = (int *)malloc(test_n * test_n * sizeof(int));
-    int *seq_res = (int *)malloc(test_n * test_n * sizeof(int));
-    int *par_res = (int *)malloc(test_n * test_n * sizeof(int));
-    int *blk_res = (int *)malloc(test_n * test_n * sizeof(int));
+    printf("[1/3] Correctness: all implementations vs independent Bellman-Ford oracle...\n");
+    run_correctness_tests();
 
-    initialize_graph(orig, test_n, 0.40, 42);
-    memcpy(seq_res, orig, test_n * test_n * sizeof(int));
-    memcpy(par_res, orig, test_n * test_n * sizeof(int));
-    memcpy(blk_res, orig, test_n * test_n * sizeof(int));
+    printf("[2/3] Cybersecurity application: attack-graph analysis...\n");
+    if (!attack_path_demo()) return 1;
 
-    printf("[1/3] Running Correctness Verification Test (V=%d)...\n", test_n);
-    floyd_warshall_sequential(seq_res, test_n);
-    floyd_warshall_parallel(par_res, test_n, 4);
-    floyd_warshall_blocked(blk_res, test_n, 4, BLOCK_SIZE);
+    if (argc > 1 && strcmp(argv[1], "--quick") == 0) return 0; // tests + demo only
 
-    int par_ok = verify_results(seq_res, par_res, test_n);
-    int blk_ok = verify_results(seq_res, blk_res, test_n);
-
-    if (par_ok && blk_ok) {
-        printf("  [PASS] Sequential, Standard OpenMP, and Blocked OpenMP results match 100%%!\n\n");
-    } else {
-        printf("  [FAIL] Result mismatch detected! (Par: %d, Blk: %d)\n", par_ok, blk_ok);
-        return 1;
-    }
-
-    free(orig);
-    free(seq_res);
-    free(par_res);
-    free(blk_res);
-
-    // Benchmark Matrix Sizes
     int sizes[] = {500, 1000, 1500, 2000};
-    int num_sizes = 4;
     int threads[] = {1, 2, 4, 8};
-    int num_threads = 4;
+    int block_sizes[] = {16, 32, 64, 128, 256};
 
     FILE *f_csv = fopen("benchmark_results.csv", "w");
-    if (!f_csv) {
-        perror("Failed to open benchmark_results.csv");
+    FILE *f_blk = fopen("block_size_results.csv", "w");
+    if (!f_csv || !f_blk) {
+        perror("Failed to open CSV output");
         return 1;
     }
     fprintf(f_csv, "Size,Implementation,Threads,ExecutionTime_Sec,Speedup,Efficiency_Pct\n");
+    fprintf(f_blk, "Size,BlockSize,Threads,ExecutionTime_Sec,Speedup\n");
 
-    printf("[2/3] Executing Scalability Benchmarks...\n");
+    printf("[3/3] Scalability benchmarks (median of %d runs, every result verified)...\n", RUNS);
     printf("%-8s %-20s %-8s %-15s %-10s %-12s\n", "Vertices", "Algorithm", "Threads", "Time (sec)", "Speedup", "Efficiency");
     printf("------------------------------------------------------------------------------\n");
 
-    for (int s = 0; s < num_sizes; s++) {
+    for (int s = 0; s < 4; s++) {
         int n = sizes[s];
-        int *base_graph = (int *)malloc(n * n * sizeof(int));
-        int *work_graph = (int *)malloc(n * n * sizeof(int));
+        size_t bytes = (size_t)n * n * sizeof(int);
+        int *base_graph = malloc(bytes), *work_graph = malloc(bytes), *ref = malloc(bytes);
         initialize_graph(base_graph, n, 0.40, 100 + s);
 
-        // Sequential Baseline Time
-        memcpy(work_graph, base_graph, n * n * sizeof(int));
-        double t_seq_start = omp_get_wtime();
-        floyd_warshall_sequential(work_graph, n);
-        double t_seq = omp_get_wtime() - t_seq_start;
+        // Sequential baseline; its result becomes the reference for every parallel run
+        double t_seq = time_algo(0, base_graph, work_graph, NULL, n, 1, 0);
+        memcpy(ref, work_graph, bytes);
+        report_row(f_csv, n, "Sequential", 1, t_seq, t_seq);
 
-        char sp_buf[16], eff_buf[16];
-        snprintf(sp_buf, sizeof(sp_buf), "%.2fx", 1.0);
-        snprintf(eff_buf, sizeof(eff_buf), "%.1f%%", 100.0);
-        printf("%-8d %-20s %-8d %-15.4f %-10s %-11s\n", n, "Sequential", 1, t_seq, sp_buf, eff_buf);
-        fprintf(f_csv, "%d,Sequential,1,%.5f,1.0000,100.00\n", n, t_seq);
+        for (int t = 0; t < 4; t++)
+            report_row(f_csv, n, "OpenMP-Standard", threads[t],
+                       time_algo(1, base_graph, work_graph, ref, n, threads[t], 0), t_seq);
+        for (int t = 0; t < 4; t++)
+            report_row(f_csv, n, "OpenMP-Blocked", threads[t],
+                       time_algo(2, base_graph, work_graph, ref, n, threads[t], BLOCK_SIZE), t_seq);
 
-        // Standard OpenMP Parallel for threads 1, 2, 4, 8
-        for (int t = 0; t < num_threads; t++) {
-            int th = threads[t];
-            memcpy(work_graph, base_graph, n * n * sizeof(int));
-            double t_start = omp_get_wtime();
-            floyd_warshall_parallel(work_graph, n, th);
-            double t_par = omp_get_wtime() - t_start;
-            double speedup = t_seq / t_par;
-            double efficiency = (speedup / th) * 100.0;
-
-            snprintf(sp_buf, sizeof(sp_buf), "%.2fx", speedup);
-            snprintf(eff_buf, sizeof(eff_buf), "%.1f%%", efficiency);
-            printf("%-8d %-20s %-8d %-15.4f %-10s %-11s\n", n, "OpenMP-Standard", th, t_par, sp_buf, eff_buf);
-            fprintf(f_csv, "%d,OpenMP-Standard,%d,%.5f,%.4f,%.2f\n", n, th, t_par, speedup, efficiency);
-        }
-
-        // Blocked OpenMP Parallel for threads 4 and 8
-        for (int t = 2; t < num_threads; t++) {
-            int th = threads[t];
-            memcpy(work_graph, base_graph, n * n * sizeof(int));
-            double t_start = omp_get_wtime();
-            floyd_warshall_blocked(work_graph, n, th, BLOCK_SIZE);
-            double t_blk = omp_get_wtime() - t_start;
-            double speedup = t_seq / t_blk;
-            double efficiency = (speedup / th) * 100.0;
-
-            snprintf(sp_buf, sizeof(sp_buf), "%.2fx", speedup);
-            snprintf(eff_buf, sizeof(eff_buf), "%.1f%%", efficiency);
-            printf("%-8d %-20s %-8d %-15.4f %-10s %-11s\n", n, "OpenMP-Blocked", th, t_blk, sp_buf, eff_buf);
-            fprintf(f_csv, "%d,OpenMP-Blocked,%d,%.5f,%.4f,%.2f\n", n, th, t_blk, speedup, efficiency);
+        // Block-size study: same graph, 8 threads, B varied
+        for (int b = 0; b < 5; b++) {
+            double t_blk = time_algo(2, base_graph, work_graph, ref, n, 8, block_sizes[b]);
+            char label[24];
+            snprintf(label, sizeof(label), "Blocked B=%d", block_sizes[b]);
+            printf("%-8d %-20s %-8d %-15.4f %.2fx\n", n, label, 8, t_blk, t_seq / t_blk);
+            fprintf(f_blk, "%d,%d,8,%.5f,%.4f\n", n, block_sizes[b], t_blk, t_seq / t_blk);
         }
         printf("------------------------------------------------------------------------------\n");
 
         free(base_graph);
         free(work_graph);
+        free(ref);
     }
 
     fclose(f_csv);
-    printf("\n[3/3] Benchmarks Completed Successfully. Data exported to benchmark_results.csv\n");
+    fclose(f_blk);
+    printf("\nDone. Data exported to benchmark_results.csv and block_size_results.csv\n");
     return 0;
 }

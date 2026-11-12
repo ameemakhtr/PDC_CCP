@@ -3,7 +3,7 @@
 
 [![Language](https://img.shields.io/badge/Language-C11-blue.svg)](https://en.wikipedia.org/wiki/C11_%28C_standard_revision%29)
 [![Framework](https://img.shields.io/badge/Parallelism-OpenMP-orange.svg)](https://www.openmp.org/)
-[![Compiler](https://img.shields.io/badge/Compiler-GCC%2016.1.0%20%7C%20OpenMP-green.svg)](https://gcc.gnu.org/)
+[![Compiler](https://img.shields.io/badge/Compiler-GCC%2016.2.0%20%7C%20OpenMP-green.svg)](https://gcc.gnu.org/)
 [![University](https://img.shields.io/badge/NED%20University-CIS%20Department-red.svg)](https://www.neduet.edu.pk/)
 ![Batch](https://img.shields.io/badge/Batch-2023-purple.svg)
 
@@ -20,7 +20,7 @@ The classical **Floyd–Warshall algorithm** solves APSP using dynamic programmi
 This project investigates the multi-core parallelization and memory hierarchy optimization of the Floyd–Warshall algorithm using OpenMP in C. Three implementations were developed and evaluated:
 1. **Sequential Baseline:** Single-threaded execution in C with contiguous 1D memory layout and early pruning.
 2. **Standard OpenMP Parallel:** Multi-threaded row-wise loop distribution (`#pragma omp parallel for schedule(static)`).
-3. **Cache-Blocked (Tiled) OpenMP Parallel:** 3-Phase block decomposition ($B = 64$) engineered to fit active tiles into the 32 KB L1 data cache per core, overcoming memory bus saturation and cache capacity misses.
+3. **Cache-Blocked (Tiled) OpenMP Parallel:** 3-Phase block decomposition (default $B = 64$, block sizes 16–256 studied) that keeps the active tiles inside each core's L1/L2 cache.
 
 ---
 
@@ -29,7 +29,12 @@ This project investigates the multi-core parallelization and memory hierarchy op
 In modern cyber defense, rapid all-pairs shortest path computation is critical for:
 - **Attack Graph Analysis & Reachability:** Enterprise network assets (workstations, DMZ proxies, Active Directory Domain Controllers) are mapped as vertices. Edges represent exploitable communication channels with weights mapped via CVSS v3.1 metrics:
   $$W(u, v) = 10 - \text{CVSS}_{\text{Exploitability}}$$
-  The parallel solver computes the **Minimum-Effort Attack Trajectory** from perimeter phished hosts to domain root credentials in milliseconds.
+  The parallel solver computes the **Minimum-Effort Attack Trajectory** from perimeter phished hosts to domain root credentials. This is implemented as step [2/3] of `main_benchmark.c` on an 8-node network:
+  ```
+  Minimum-effort attack path (effort 11):
+    Phished-PC -> HR-Workstation -> File-Server -> Jump-Host -> Domain-Controller
+  Blast radius from Phished-PC (effort <= 7): Web-DMZ(6) HR-Workstation(2) File-Server(5) Jump-Host(7)
+  ```
 - **Blast Radius Containment:** Instant identification of all assets reachable within a risk threshold $R \le R_{max}$ to automate emergency firewall micro-segmentation during active ransomware outbreaks.
 - **Zero-Trust Network Optimization:** Centrality calculations identify pivotal choke point routers where IPS and EDR inspection must be prioritized.
 
@@ -69,32 +74,37 @@ Partitions the $N \times N$ matrix into $B \times B$ blocks ($B = 64$). For each
 - **Phase 1 (Diagonal Block):** Self-dependent pivot tile $(k_b, k_b)$ is computed.
 - **Phase 2 (Cross Blocks):** Row blocks $(k_b, j_b)$ and column blocks $(i_b, k_b)$ are updated concurrently in parallel using OpenMP.
 - **Phase 3 (Independent Blocks):** Remaining $(N/B - 1)^2$ tiles are updated simultaneously via `#pragma omp parallel for collapse(2) schedule(static)`.
-- *Cache Impact:* Each $64 \times 64$ sub-block requires $64 \times 64 \times 4\text{ bytes} = 16\text{ KB}$, fitting completely inside L1 cache (32 KB per core), converting memory stall bottlenecks into high-throughput streaming computation.
+- *Cache Impact:* Each kernel call touches three $B \times B$ tiles ($3 \times 4B^2$ bytes): 12 KB at $B = 32$ (fits the 32 KB L1), 48 KB at $B = 64$ (fits the 256 KB L2), 768 KB at $B = 256$ (spills to L3, the slowest).
 
 ---
 
 ## 📊 Empirical Simulation Results
 
-Evaluated on a 12-core host system using GCC 16.1.0 (`-O3 -fopenmp`) across random directed graphs ($p = 0.40$). Metrics strictly conform to **NED CS-428 Lab 4**:
+Evaluated on an Intel Core i7-9750H (6 cores / 12 hardware threads) using GCC 16.2.0 (`-O3 -fopenmp`) across random directed graphs ($p = 0.40$). Every time is the **median of 3 runs**, and every parallel result is checked against the sequential output. Metrics strictly conform to **NED CS-428 Lab 4**:
 - **Speedup:** $\psi(n, p) = \frac{T_{seq}}{T_p}$
 - **Efficiency:** $\varepsilon(n, p) = \frac{\psi(n, p)}{p} \times 100\%$
 - **Parallel Cost:** $c(n, p) = p \times T_p$ (processor-seconds)
 
 | Vertices ($V$) | Algorithm Variant | Threads ($p$) | Time ($T_p$) | Speedup $\psi$ | Efficiency $\varepsilon$ | Parallel Cost $c(n,p)$ |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
-| **500** | Sequential | 1 | 0.1520 s | 1.00x | 100.0% | **0.152 p-s** |
-| **500** | OpenMP-Standard | 4 | 0.1100 s | 1.38x | 34.5% | 0.440 p-s |
-| **500** | OpenMP-Blocked | 8 | **0.0730 s** | **2.08x** | **26.0%** | **0.584 p-s** |
-| **1000** | Sequential | 1 | 1.5700 s | 1.00x | 100.0% | **1.570 p-s** |
-| **1000** | OpenMP-Standard | 4 | 1.0320 s | 1.52x | 38.0% | 4.128 p-s |
-| **1000** | OpenMP-Standard | 8 | 0.7290 s | 2.15x | 26.9% | 5.832 p-s |
-| **1000** | OpenMP-Blocked | 8 | **0.6210 s** | **2.53x** | **31.6%** | **4.968 p-s** |
-| **2000** | Sequential | 1 | 13.9480 s | 1.00x | 100.0% | **13.948 p-s** |
-| **2000** | OpenMP-Standard | 4 | 11.4160 s | 1.22x | 30.5% | 45.664 p-s |
-| **2000** | OpenMP-Standard | 8 | 9.1540 s | 1.52x | 19.0% | 73.232 p-s |
-| **2000** | OpenMP-Blocked | 8 | **5.8120 s** | **2.40x** | **30.0%** | **46.496 p-s** |
+| **500** | Sequential | 1 | 0.1310 s | 1.00x | 100.0% | **0.131 p-s** |
+| **500** | OpenMP-Standard | 8 | 0.0770 s | 1.70x | 21.3% | 0.616 p-s |
+| **500** | OpenMP-Blocked | 8 | **0.0400 s** | **3.27x** | **40.9%** | **0.320 p-s** |
+| **1000** | Sequential | 1 | 1.1500 s | 1.00x | 100.0% | **1.150 p-s** |
+| **1000** | OpenMP-Standard | 8 | 0.3270 s | 3.52x | 44.0% | 2.616 p-s |
+| **1000** | OpenMP-Blocked | 8 | **0.2680 s** | **4.29x** | **53.6%** | **2.144 p-s** |
+| **1500** | Sequential | 1 | 4.0940 s | 1.00x | 100.0% | **4.094 p-s** |
+| **1500** | OpenMP-Standard | 8 | 0.9360 s | 4.37x | 54.7% | 7.488 p-s |
+| **1500** | OpenMP-Blocked | 8 | **0.8470 s** | **4.83x** | **60.4%** | **6.776 p-s** |
+| **2000** | Sequential | 1 | 9.6350 s | 1.00x | 100.0% | **9.635 p-s** |
+| **2000** | OpenMP-Standard | 8 | 2.0260 s | 4.76x | 59.5% | 16.208 p-s |
+| **2000** | OpenMP-Blocked | 8 | **1.9690 s** | **4.89x** | **61.2%** | **15.752 p-s** |
 
-> **Key Finding:** At $V = 2000$ (8 billion operations), Cache-Blocked OpenMP reduced the total execution time from **13.95s to 5.81s** (**2.40x speedup**), outperforming standard parallelization by **36.5%** due to high cache reuse. Resulting matrices were verified with 100% bitwise accuracy.
+Full results for 1/2/4/8 threads: [`benchmark_results.csv`](benchmark_results.csv). Block-size study: [`block_size_results.csv`](block_size_results.csv).
+
+> **Key Finding:** At $V = 2000$ (8 billion operations), runtime fell from **9.64s to 1.97s** (**4.89x speedup**, blocked, 8 threads). Blocking beat standard parallelization at every size, by 92% at $V = 500$ (mostly from needing $2V/B$ barriers instead of $V$) and about 3% at $V = 2000$. Block sizes $B = 32$–$64$ were fastest and $B = 256$ the slowest. Efficiency at 8 threads stays near 60% because the CPU has only 6 physical cores.
+>
+> **Correctness:** 1,224 test runs (8 graph sizes incl. 1, 63, 64, 65 vertices × 3 densities × 3 seeds × every thread count and block size) match an independent Bellman-Ford oracle exactly.
 
 ---
 
@@ -110,21 +120,28 @@ Evaluated on a 12-core host system using GCC 16.1.0 (`-O3 -fopenmp`) across rand
   <img src="efficiency_plot.png" width="48%" alt="Efficiency Analysis" />
 </p>
 
+<p align="center">
+  <img src="block_size_analysis.png" width="60%" alt="Block Size Analysis" />
+</p>
+
 ---
 
 ## 🛠️ How to Build & Run
 
 ### Prerequisites
 - GCC / MinGW with OpenMP support (`gcc -fopenmp`)
-- Python 3 with `matplotlib` and `pandas` (optional, for regenerating plots)
+- Python 3 with `matplotlib`, `pandas`, `reportlab` and `python-docx` (optional, for regenerating plots and reports)
 
 ### Compilation
 ```bash
 # Compile benchmark harness with OpenMP and maximum optimization
 gcc -O3 -fopenmp main_benchmark.c -o benchmark.exe
 
-# Run verification and scalability benchmarks
+# Run correctness tests, attack-path demo and benchmarks (~5 min, rewrites both CSVs)
 ./benchmark.exe
+
+# Only correctness tests + attack-path demo (~10 s)
+./benchmark.exe --quick
 ```
 
 ### Regenerate Plots & Reports
