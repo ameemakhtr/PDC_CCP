@@ -268,14 +268,14 @@ def create_docx_report():
     p_achieve_desc.paragraph_format.line_spacing = 1.15
     p_achieve_desc.paragraph_format.space_after = Pt(8)
     p_achieve_desc.add_run(
-        "To address this computational bottleneck, three distinct implementations were engineered and evaluated: (1) a baseline Sequential Implementation in C, (2) a Standard OpenMP Parallel Implementation distributing row updates across multiple hardware threads, and (3) an advanced Cache-Blocked (Tiled) OpenMP Parallel Implementation designed to maximize L1/L2 cache hits and mitigate memory bus saturation, with block sizes B in {16, 32, 64, 128, 256} studied. Scalability and performance benchmarks were executed across graph sizes of V in {500, 1000, 1500, 2000} vertices utilizing 1, 2, 4, and 8 threads on an Intel Core i7-9750H (6 cores / 12 hardware threads)."
+        "To address this computational bottleneck, three distinct implementations were engineered and evaluated: (1) a baseline Sequential Implementation in C, (2) a Standard OpenMP Parallel Implementation distributing row updates across multiple hardware threads, and (3) an advanced Cache-Blocked (Tiled) OpenMP Parallel Implementation designed to maximize L1/L2 cache hits and mitigate memory bus saturation, with block sizes B in {16, 32, 64, 128, 256} studied. Scalability and performance benchmarks were executed across graph sizes of V in {500, 1000, 1500, 2000} vertices utilizing 1, 2, 4, 6, 8 and 12 threads on an Intel Core i7-9750H (6 cores / 12 hardware threads)."
     )
 
     p_results_desc = doc.add_paragraph()
     p_results_desc.paragraph_format.line_spacing = 1.15
     p_results_desc.paragraph_format.space_after = Pt(8)
     p_results_desc.add_run(
-        "Every timing is the median of 3 runs. At V = 2000 (8 billion inner-loop operations), Standard OpenMP reduced runtime from 9.635s to 2.026s (4.76x speedup) and Cache-Blocked OpenMP to 1.969s (4.89x speedup, 61% efficiency on 8 threads). Blocking gave its largest gain on small graphs (3.27x vs 1.70x at V = 500) because it needs far fewer barrier synchronizations; on large graphs the gain shrank to about 3%. A block-size study found B = 32-64 fastest. Correctness was verified on 1,224 test runs against an independent Bellman-Ford oracle, and every benchmark result was checked against the sequential output. An attack-graph demo shows the solver finding the minimum-effort attack path and blast radius in an enterprise network."
+        "Every timing is the median of 5 round-robin runs. At V = 2000 (8 billion inner-loop operations), Standard OpenMP reduced runtime from 9.677s to 2.401s on 8 threads (4.03x speedup) and Cache-Blocked OpenMP to 2.160s (4.48x), reaching 4.91x (1.969s) on 12 threads. Blocking gave its largest gain on small graphs (3.68x vs 1.66x at V = 500) because it needs far fewer barrier synchronizations. Parallel overhead was quantified with T_o = p*T_p - T_seq and the Karp-Flatt metric, and a block-size study found B = 64 fastest. Correctness was verified on 1,800 test runs against an independent Bellman-Ford oracle, and every benchmark result was checked against the sequential output. An attack-graph demo shows the solver finding the minimum-effort attack path and blast radius in an enterprise network."
     )
 
     # -------------------------------------------------------------
@@ -518,7 +518,7 @@ def create_docx_report():
     p_sim_exp.paragraph_format.line_spacing = 1.15
     p_sim_exp.paragraph_format.space_after = Pt(6)
     p_sim_exp.add_run(
-        "Empirical benchmarks were conducted on an Intel Core i7-9750H (6 cores / 12 hardware threads, 32 KB L1D + 256 KB L2 per core, 12 MB shared L3) using GCC 16.2.0 (-O3 -fopenmp). Each time is the median of 3 runs, and every parallel result was verified against the sequential output. In strict alignment with CS-428 Lab 4 (Performance Analysis of Real OpenMP Applications), the parallel solutions were evaluated across three foundational performance metrics:\n"
+        "Empirical benchmarks were conducted on an Intel Core i7-9750H (6 cores / 12 hardware threads, 32 KB L1D + 256 KB L2 per core, 12 MB shared L3) using GCC 16.2.0 (-O3 -fopenmp). Each time is the median of 5 runs, taken round-robin (every configuration once per round) so CPU clock drift affects all of them equally, and every parallel result was verified against the sequential output. In strict alignment with CS-428 Lab 4 (Performance Analysis of Real OpenMP Applications), the parallel solutions were evaluated across three foundational performance metrics:\n"
         "• Speedup ψ(n, p) = T_seq / T_p: Relative performance compared to the sequential baseline.\n"
         "• Efficiency ε(n, p) = ψ(n, p) / p * 100%: Percentage of time each hardware thread is usefully utilized.\n"
         "• Parallel Cost c(n, p) = p * T_p: Resource expenditure in processor-seconds, demonstrating cost-optimality when c(n, p) approaches sequential time."
@@ -625,9 +625,9 @@ def create_docx_report():
     p_con_intro.add_run("This project successfully designed, implemented, and empirically evaluated parallel optimizations for the Floyd-Warshall All-Pairs Shortest Path algorithm. On moderate to large graph sizes, shared-memory multi-threading delivered marked performance gains over single-threaded sequential execution:")
 
     # BULLETS ON NEW LINES
-    add_bullet_item(doc, "Standard OpenMP:", "Reached 4.76x speedup on 8 threads at V = 2000 (2.026s vs 9.635s sequential) and 3.52x at V = 1000 (0.327s vs 1.150s).")
-    add_bullet_item(doc, "Cache-Blocked OpenMP:", "Reached 4.89x speedup at V = 2000 (1.969s) and 4.29x at V = 1000 (0.268s). Blocking beat standard parallelization at every size: by 92% at V = 500, 22% at V = 1000 and about 3% at V = 2000. Block sizes B = 32 and 64 were fastest; B = 256 was slowest because its three active tiles (768 KB) no longer fit in the 256 KB L2 cache.")
-    add_bullet_item(doc, "Parallel Overhead:", "With 1 thread, both OpenMP versions run at 0.72-1.02x of the sequential code, which measures thread start-up and blocking loop overhead. The blocked version's large gain at V = 500 (1.9x) comes mostly from needing 2V/B barriers instead of V.")
+    add_bullet_item(doc, "Standard OpenMP:", "Reached 4.03x speedup on 8 threads at V = 2000 (2.401s vs 9.677s sequential) and 2.79x at V = 1000 (0.415s vs 1.157s). Going from 8 to 12 threads changed its speedup by only -0.11x to +0.33x.")
+    add_bullet_item(doc, "Cache-Blocked OpenMP:", "Reached 4.48x speedup on 8 threads and 4.91x on 12 threads at V = 2000 (1.969s), and 4.16x at V = 1000 (0.278s, 8 threads). With 8 threads, blocking beat standard parallelization at every size: by 122% at V = 500, 49% at V = 1000, 17% at V = 1500 and 11% at V = 2000. B = 64 was the fastest block size, or within 1% of it, at every size.")
+    add_bullet_item(doc, "Parallel Overhead:", "With 1 thread, both OpenMP versions run within +/-10% of the sequential code (0.91-1.07x), so thread start-up overhead is small. The blocked version's large gain at V = 500 (2.2x) comes mostly from needing 2V/B barriers instead of V.")
 
     p_c2_h = doc.add_paragraph()
     p_c2_h.paragraph_format.space_before = Pt(6)
@@ -644,7 +644,44 @@ def create_docx_report():
     # NUMBERED ITEMS ON NEW LINES
     add_num_item(doc, "1.", "Thread Synchronization Barriers:", "Because iteration k strictly requires the completed state of iteration k-1, an implicit barrier synchronization occurs at the end of every k phase (2000 total barriers for V=2000). Thread fork-join overhead and scheduling jitter accumulate across iterations.")
     add_num_item(doc, "2.", "Memory Bandwidth Saturation:", "The standard algorithm possesses low arithmetic intensity (~0.17 ops/byte). When multiple threads concurrently stream non-contiguous column elements from main RAM, the shared multi-core memory bus saturates, creating memory stall cycles.")
-    add_num_item(doc, "3.", "Physical Core Limit:", "The i7-9750H has 6 physical cores, so the 8-thread runs place two threads on some cores through Hyper-Threading, where they share execution units and L1/L2 caches. This caps 8-thread efficiency near 60%.")
+    add_num_item(doc, "3.", "Physical Core Limit:", "The i7-9750H has 6 physical cores. Threads 7-12 run on the same cores through Hyper-Threading and share their execution units and L1/L2 caches. From 8 to 12 threads, Standard OpenMP changed by -0.11x to +0.33x speedup, while the cache-friendly Blocked version still gained 0.21x to 0.98x.")
+
+    p_oh_h = doc.add_paragraph()
+    p_oh_h.paragraph_format.space_before = Pt(6)
+    p_oh_h.paragraph_format.space_after = Pt(4)
+    r_oh = p_oh_h.add_run("Parallel Overhead and Karp-Flatt Analysis:")
+    r_oh.bold = True
+    r_oh.font.size = Pt(11)
+    p_oh = doc.add_paragraph()
+    p_oh.paragraph_format.line_spacing = 1.15
+    p_oh.paragraph_format.space_after = Pt(4)
+    p_oh.add_run("Parallel overhead is the total thread-time not spent on useful work, T_o = p*T_p - T_seq, and the Karp-Flatt metric e = (1/speedup - 1/p) / (1 - 1/p) estimates the effective serial fraction from the measured speedup. With 1 thread, T_o is within +/-10% of T_seq (measurement noise), so thread start-up is cheap. T_o then grows with p: at V = 2000 Standard OpenMP wastes 4.1 s of thread-time at p = 2 and 20.0 s at p = 12, the Blocked version 3.9 s and 14.0 s. The Blocked version has the lower e in 19 of the 20 cases below. In 6 of 8 cases e rises from 8 to 12 threads: overhead (barriers and Hyper-Threading contention) grows faster than useful work, rather than a fixed serial part limiting speedup. e is highest at V = 500, where each barrier guards only 250,000 cell updates.")
+
+    # Karp-Flatt serial fraction e per thread count, read from benchmark_results.csv
+    with open('benchmark_results.csv') as f:
+        bench = list(csv.DictReader(f))
+    kf_threads = ['2', '4', '6', '8', '12']
+    kf_rows = [["Vertices (V)", "Variant"] + [f"e (p={p})" for p in kf_threads] + ["T_o (p=12)"]]
+    for size in sorted({r['Size'] for r in bench}, key=int):
+        for impl in ("OpenMP-Standard", "OpenMP-Blocked"):
+            sub = {r['Threads']: r for r in bench if r['Size'] == size and r['Implementation'] == impl}
+            kf_rows.append([size, impl.split('-')[1]] + [f"{float(sub[p]['KarpFlatt']):.3f}" for p in kf_threads]
+                           + [f"{float(sub['12']['Overhead_Sec']):.2f} s"])
+    kf_table = doc.add_table(rows=len(kf_rows), cols=len(kf_rows[0]))
+    kf_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for r_idx, row_values in enumerate(kf_rows):
+        for c_idx, val in enumerate(row_values):
+            cell = kf_table.rows[r_idx].cells[c_idx]
+            cell.text = val
+            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = cell.paragraphs[0].runs[0]
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(8.5)
+            if r_idx == 0:
+                run.bold = True
+                run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+                set_cell_background(cell, "2C3E50")
+            set_cell_margins(cell, top=40, bottom=40, left=50, right=50)
 
     p_c3_h = doc.add_paragraph()
     p_c3_h.paragraph_format.space_before = Pt(6)
@@ -701,7 +738,7 @@ def create_docx_report():
     p_add2.paragraph_format.line_spacing = 1.15
     p_add2.paragraph_format.space_after = Pt(6)
     p_add2.add_run(
-        "In the inner loop, two memory loads and one write accompany one addition and one comparison, yielding an intensity of ~0.17 ops/byte, so naive Floyd-Warshall is memory-bound. A blocked tile kernel touches 3 x 4 x B^2 bytes, and the block-size study (Figure 5) shows the effect directly: B = 32 (12 KB, fits L1) and B = 64 (48 KB, fits L2) are fastest and within about 6% of each other; B = 128 (192 KB) is close on large graphs but clearly slower at V = 500; B = 256 (768 KB) exceeds the 256 KB L2 cache and is the slowest at every size; B = 16 is also slower because loop overhead dominates such small tiles."
+        "In the inner loop, two memory loads and one write accompany one addition and one comparison, yielding an intensity of ~0.17 ops/byte, so naive Floyd-Warshall is memory-bound. A blocked tile kernel touches 3 x 4 x B^2 bytes: 12 KB at B = 32 (fits L1), 48 KB at B = 64 and 192 KB at B = 128 (fit the 256 KB L2), and 768 KB at B = 256 (spills to L3). The block-size study (Figure 5) found B = 64 the fastest, or within 1% of the fastest, at every graph size, which supports it as the default. Small tiles (B = 16) are slower at every size because they need 2V/B barriers (250 at V = 2000) and run very short inner loops. Large tiles (B = 256) leave too few tiles to keep 8 threads busy: at V = 500 only one Phase-3 tile remains, so B = 256 runs at 1.05x, barely faster than sequential."
     )
 
     # Figures in added info
@@ -739,6 +776,14 @@ def create_docx_report():
         rc5 = p5.add_run("\nFigure 5: Block Size vs Speedup (Blocked OpenMP, 8 Threads)")
         rc5.font.size = Pt(8.5)
         rc5.font.italic = True
+
+    if os.path.exists('overhead_analysis.png'):
+        p6 = doc.add_paragraph()
+        p6.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p6.add_run().add_picture('overhead_analysis.png', width=Inches(3.6))
+        rc6 = p6.add_run("\nFigure 6: Karp-Flatt Serial Fraction vs Threads")
+        rc6.font.size = Pt(8.5)
+        rc6.font.italic = True
 
     output_path = "Complex_Computing_Problem_Report.docx"
     doc.save(output_path)

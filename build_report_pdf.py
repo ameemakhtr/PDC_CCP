@@ -250,7 +250,7 @@ def generate_pdf():
         body_style
     ))
     story.append(Paragraph(
-        "<b>Key Achievements:</b> Benchmarks were run on an Intel Core i7-9750H (6 cores / 12 hardware threads) across graph sizes <i>V</i> &isin; {500, 1000, 1500, 2000} using 1, 2, 4, and 8 threads, with every timing taken as the median of 3 runs. At <i>V</i> = 2000 (8 billion inner-loop operations), Standard OpenMP reduced runtime from 9.635s to 2.026s (<b>4.76x speedup</b>) and Cache-Blocked OpenMP to <b>1.969s</b> (<b>4.89x speedup</b>, 61% efficiency on 8 threads). Blocking gave its largest gain on small graphs (3.27x vs 1.70x at <i>V</i> = 500) because it needs far fewer barrier synchronizations; on large graphs the gain shrank to about 3%. A block-size study found <i>B</i> = 32-64 fastest. Correctness was verified on 1,224 test runs against an independent Bellman-Ford oracle, and every benchmark result was checked against the sequential output.",
+        "<b>Key Achievements:</b> Benchmarks were run on an Intel Core i7-9750H (6 cores / 12 hardware threads) across graph sizes <i>V</i> &isin; {500, 1000, 1500, 2000} using 1, 2, 4, 6, 8 and 12 threads, with every timing taken as the median of 5 round-robin runs. At <i>V</i> = 2000 (8 billion inner-loop operations), Standard OpenMP reduced runtime from 9.677s to 2.401s on 8 threads (<b>4.03x speedup</b>) and Cache-Blocked OpenMP to 2.160s (<b>4.48x</b>), reaching <b>4.91x</b> (1.969s) on 12 threads. Blocking gave its largest gain on small graphs (3.68x vs 1.66x at <i>V</i> = 500) because it needs far fewer barrier synchronizations. Parallel overhead was quantified with <i>T<sub>o</sub> = p&middot;T<sub>p</sub> - T<sub>seq</sub></i> and the Karp-Flatt metric, and a block-size study found <i>B</i> = 64 fastest. Correctness was verified on 1,800 test runs against an independent Bellman-Ford oracle, and every benchmark result was checked against the sequential output.",
         body_style
     ))
     story.append(PageBreak())
@@ -436,7 +436,7 @@ def generate_pdf():
     story.append(Spacer(1, 10))
     story.append(Paragraph("Simulation Results:", section_heading))
     story.append(Paragraph(
-        "Empirical benchmarks were conducted on an Intel Core i7-9750H (6 cores / 12 hardware threads, 32 KB L1D + 256 KB L2 per core, 12 MB shared L3) using GCC 16.2.0 (<font face='Courier'>-O3 -fopenmp</font>). Each time is the median of 3 runs, and every parallel result was verified against the sequential output. In strict conformance with <b>CS-428 Lab 4 (Performance Analysis of Real OpenMP Applications)</b>, performance is analyzed across Speedup &psi;(<i>n, p</i>), Efficiency &epsilon;(<i>n, p</i>), and Parallel Cost <i>c(n, p) = p &times; T<sub>p</sub></i> (processor-seconds):",
+        "Empirical benchmarks were conducted on an Intel Core i7-9750H (6 cores / 12 hardware threads, 32 KB L1D + 256 KB L2 per core, 12 MB shared L3) using GCC 16.2.0 (<font face='Courier'>-O3 -fopenmp</font>). Each time is the median of 5 runs, taken round-robin (every configuration once per round) so CPU clock drift affects all of them equally, and every parallel result was verified against the sequential output. In strict conformance with <b>CS-428 Lab 4 (Performance Analysis of Real OpenMP Applications)</b>, performance is analyzed across Speedup &psi;(<i>n, p</i>), Efficiency &epsilon;(<i>n, p</i>), and Parallel Cost <i>c(n, p) = p &times; T<sub>p</sub></i> (processor-seconds):",
         body_style
     ))
 
@@ -486,7 +486,7 @@ def generate_pdf():
 
     story.append(Spacer(1, 4))
     story.append(Paragraph(
-        "<b>Performance Analysis:</b> Both parallel versions scale with graph size: at 8 threads the Standard OpenMP speedup rises from 1.70x (<i>V</i> = 500) to 4.76x (<i>V</i> = 2000), because larger graphs give each thread more work per synchronization barrier. The Cache-Blocked version is faster at every size, but its advantage falls from 1.9x at <i>V</i> = 500 to about 3% at <i>V</i> = 2000: on small graphs it wins mainly by replacing <i>V</i> barriers with 2<i>V</i>/<i>B</i> barriers, while on large graphs both versions are limited by memory bandwidth and by the 6 physical cores. With 1 thread, both OpenMP versions run at 0.72-1.02x of the sequential code, which measures the parallel overhead (thread start-up and the extra loop structure of blocking).",
+        "<b>Performance Analysis:</b> Both parallel versions scale with graph size: at 8 threads the Standard OpenMP speedup rises from 1.66x (<i>V</i> = 500) to 4.03x (<i>V</i> = 2000), because larger graphs give each thread more work per synchronization barrier. The Cache-Blocked version is faster at every size, but its advantage falls from 2.2x at <i>V</i> = 500 to 11% at <i>V</i> = 2000: on small graphs it wins mainly by replacing <i>V</i> barriers with 2<i>V</i>/<i>B</i> barriers, while on large graphs both versions are limited by memory bandwidth and by the 6 physical cores. With 1 thread, both OpenMP versions run within &plusmn;10% of the sequential code (0.91-1.07x), so thread start-up overhead is small.",
         body_style
     ))
     story.append(PageBreak())
@@ -503,11 +503,11 @@ def generate_pdf():
     ))
     # SEPARATE BULLETS ON NEW LINES WITH PROPER INDENTATION
     story.append(Paragraph(
-        "&bull; <b>Standard OpenMP:</b> Reached <b>4.76x speedup</b> on 8 threads at <i>V</i> = 2000 (2.026s vs 9.635s sequential) and <b>3.52x</b> at <i>V</i> = 1000 (0.327s vs 1.150s).",
+        "&bull; <b>Standard OpenMP:</b> Reached <b>4.03x speedup</b> on 8 threads at <i>V</i> = 2000 (2.401s vs 9.677s sequential) and <b>2.79x</b> at <i>V</i> = 1000 (0.415s vs 1.157s). Going from 8 to 12 threads changed its speedup by only -0.11x to +0.33x.",
         bullet_style
     ))
     story.append(Paragraph(
-        "&bull; <b>Cache-Blocked OpenMP:</b> Reached <b>4.89x speedup</b> at <i>V</i> = 2000 (1.969s) and <b>4.29x</b> at <i>V</i> = 1000 (0.268s). Blocking beat standard parallelization at every size: by 92% at <i>V</i> = 500, 22% at <i>V</i> = 1000 and about 3% at <i>V</i> = 2000. Block sizes <i>B</i> = 32 and 64 were fastest; <i>B</i> = 256 was slowest because its three active tiles (768 KB) no longer fit in the 256 KB L2 cache.",
+        "&bull; <b>Cache-Blocked OpenMP:</b> Reached <b>4.48x speedup</b> on 8 threads and <b>4.91x</b> on 12 threads at <i>V</i> = 2000 (1.969s), and <b>4.16x</b> at <i>V</i> = 1000 (0.278s, 8 threads). With 8 threads, blocking beat standard parallelization at every size: by 122% at <i>V</i> = 500, 49% at <i>V</i> = 1000, 17% at <i>V</i> = 1500 and 11% at <i>V</i> = 2000. <i>B</i> = 64 was the fastest block size, or within 1% of it, at every size.",
         bullet_style
     ))
     story.append(Spacer(1, 4))
@@ -527,9 +527,36 @@ def generate_pdf():
         numbered_style
     ))
     story.append(Paragraph(
-        "<b>3. Physical Core Limit:</b> The i7-9750H has 6 physical cores, so the 8-thread runs place two threads on some cores through Hyper-Threading, where they share execution units and L1/L2 caches. This caps 8-thread efficiency near 60%.",
+        "<b>3. Physical Core Limit:</b> The i7-9750H has 6 physical cores. Threads 7-12 run on the same cores through Hyper-Threading and share their execution units and L1/L2 caches. From 8 to 12 threads, Standard OpenMP changed by -0.11x to +0.33x speedup, while the cache-friendly Blocked version still gained 0.21x to 0.98x.",
         numbered_style
     ))
+    story.append(Spacer(1, 4))
+
+    story.append(Paragraph("<b>Parallel Overhead and Karp-Flatt Analysis:</b>", sub_heading))
+    story.append(Paragraph("<i>T<sub>o</sub> = p&middot;T<sub>p</sub> - T<sub>seq</sub></i> is the total thread-time not spent on useful work, and the Karp-Flatt metric <i>e = (1/&psi; - 1/p) / (1 - 1/p)</i> estimates the effective serial fraction. At 1 thread <i>T<sub>o</sub></i> is within &plusmn;10% of <i>T<sub>seq</sub></i>, so thread start-up is cheap. At <i>V</i> = 2000, <i>T<sub>o</sub></i> grows from 4.1 s (<i>p</i> = 2) to 20.0 s (<i>p</i> = 12) for Standard OpenMP and from 3.9 s to 14.0 s for Blocked. Blocked has the lower <i>e</i> in 19 of 20 cases, and in 6 of 8 cases <i>e</i> rises from 8 to 12 threads: overhead (barriers, Hyper-Threading contention) grows faster than useful work.", body_style))
+    # Karp-Flatt serial fraction e per thread count, read from benchmark_results.csv
+    with open('benchmark_results.csv') as f:
+        bench = list(csv.DictReader(f))
+    kf_threads = ['2', '4', '6', '8', '12']
+    kf_data = [["Vertices (V)", "Variant"] + [f"e (p={p})" for p in kf_threads] + ["T_o (p=12)"]]
+    for size in sorted({r['Size'] for r in bench}, key=int):
+        for impl in ("OpenMP-Standard", "OpenMP-Blocked"):
+            sub = {r['Threads']: r for r in bench if r['Size'] == size and r['Implementation'] == impl}
+            kf_data.append([size, impl.split('-')[1]] + [f"{float(sub[p]['KarpFlatt']):.3f}" for p in kf_threads]
+                           + [f"{float(sub['12']['Overhead_Sec']):.2f} s"])
+    t_kf = Table(kf_data, colWidths=[0.85*inch, 0.85*inch] + [0.7*inch] * 5 + [0.85*inch])
+    t_kf.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#2C3E50")),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('FONTNAME', (0,0), (-1,0), 'Times-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#BDC3C7")),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#F8F9FA")])
+    ]))
+    story.append(t_kf)
     story.append(Spacer(1, 4))
 
     story.append(Paragraph("<b>Significance for Cybersecurity Engineering:</b>", sub_heading))
@@ -566,7 +593,7 @@ def generate_pdf():
 
     story.append(Paragraph("<b>2. Roofline Model & Speedup Visualizations</b>", sub_heading))
     story.append(Paragraph(
-        "Because Floyd-Warshall executes 2 memory reads and 1 write for every addition and comparison, it is memory-bandwidth bound. A tile kernel touches 3 &times; 4 &times; <i>B</i><sup>2</sup> bytes, and the block-size study (Figure 5) shows the effect directly: <i>B</i> = 32 (12 KB, fits L1) and <i>B</i> = 64 (48 KB, fits L2) are fastest and within about 6% of each other; <i>B</i> = 128 (192 KB) is close on large graphs but clearly slower at <i>V</i> = 500; <i>B</i> = 256 (768 KB) exceeds the 256 KB L2 cache and is the slowest at every size; <i>B</i> = 16 is also slower because loop overhead dominates such small tiles.",
+        "Because Floyd-Warshall executes 2 memory reads and 1 write for every addition and comparison, it is memory-bandwidth bound. A tile kernel touches 3 &times; 4 &times; <i>B</i><sup>2</sup> bytes: 12 KB at <i>B</i> = 32 (fits L1), 48 KB at <i>B</i> = 64 and 192 KB at <i>B</i> = 128 (fit the 256 KB L2), and 768 KB at <i>B</i> = 256 (spills to L3). The block-size study (Figure 5) found <i>B</i> = 64 the fastest, or within 1% of the fastest, at every graph size, which supports it as the default. Small tiles (<i>B</i> = 16) are slower at every size because they need 2<i>V</i>/<i>B</i> barriers (250 at <i>V</i> = 2000) and run very short inner loops. Large tiles (<i>B</i> = 256) leave too few tiles to keep 8 threads busy: at <i>V</i> = 500 only one Phase-3 tile remains, so <i>B</i> = 256 runs at 1.05x, barely faster than sequential.",
         body_style
     ))
 
@@ -589,10 +616,16 @@ def generate_pdf():
         ]))
         story.append(t_img2)
 
-    if os.path.exists("block_size_analysis.png"):
+    if os.path.exists("block_size_analysis.png") and os.path.exists("overhead_analysis.png"):
+        t_img3 = Table([
+            [RLImage("block_size_analysis.png", width=3.1*inch, height=1.85*inch),
+             RLImage("overhead_analysis.png", width=3.1*inch, height=1.85*inch)],
+            [Paragraph("<font size=8><i>Figure 5: Block Size vs Speedup (8 threads)</i></font>", body_style),
+             Paragraph("<font size=8><i>Figure 6: Karp-Flatt Serial Fraction vs Threads</i></font>", body_style)]
+        ], colWidths=[3.25*inch, 3.25*inch])
+        t_img3.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('BOTTOMPADDING', (0,0), (-1,-1), 1), ('TOPPADDING', (0,0), (-1,-1), 1)]))
         story.append(Spacer(1, 4))
-        story.append(RLImage("block_size_analysis.png", width=3.6*inch, height=2.15*inch))
-        story.append(Paragraph("<font size=8><i>Figure 5: Block Size vs Speedup (Blocked OpenMP, 8 threads)</i></font>", body_style))
+        story.append(t_img3)
 
     doc.build(story, canvasmaker=NumberedCanvas)
     print(f"Successfully generated PDF: {pdf_filename}")

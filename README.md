@@ -80,31 +80,33 @@ Partitions the $N \times N$ matrix into $B \times B$ blocks ($B = 64$). For each
 
 ## 📊 Empirical Simulation Results
 
-Evaluated on an Intel Core i7-9750H (6 cores / 12 hardware threads) using GCC 16.2.0 (`-O3 -fopenmp`) across random directed graphs ($p = 0.40$). Every time is the **median of 3 runs**, and every parallel result is checked against the sequential output. Metrics strictly conform to **NED CS-428 Lab 4**:
+Evaluated on an Intel Core i7-9750H (6 cores / 12 hardware threads) using GCC 16.2.0 (`-O3 -fopenmp`) across random directed graphs ($p = 0.40$). Every time is the **median of 5 round-robin runs** (each round times every configuration once, so CPU clock drift hits all of them equally), and every parallel result is checked against the sequential output. Metrics strictly conform to **NED CS-428 Lab 4**:
 - **Speedup:** $\psi(n, p) = \frac{T_{seq}}{T_p}$
 - **Efficiency:** $\varepsilon(n, p) = \frac{\psi(n, p)}{p} \times 100\%$
 - **Parallel Cost:** $c(n, p) = p \times T_p$ (processor-seconds)
 
 | Vertices ($V$) | Algorithm Variant | Threads ($p$) | Time ($T_p$) | Speedup $\psi$ | Efficiency $\varepsilon$ | Parallel Cost $c(n,p)$ |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
-| **500** | Sequential | 1 | 0.1310 s | 1.00x | 100.0% | **0.131 p-s** |
-| **500** | OpenMP-Standard | 8 | 0.0770 s | 1.70x | 21.3% | 0.616 p-s |
-| **500** | OpenMP-Blocked | 8 | **0.0400 s** | **3.27x** | **40.9%** | **0.320 p-s** |
-| **1000** | Sequential | 1 | 1.1500 s | 1.00x | 100.0% | **1.150 p-s** |
-| **1000** | OpenMP-Standard | 8 | 0.3270 s | 3.52x | 44.0% | 2.616 p-s |
-| **1000** | OpenMP-Blocked | 8 | **0.2680 s** | **4.29x** | **53.6%** | **2.144 p-s** |
-| **1500** | Sequential | 1 | 4.0940 s | 1.00x | 100.0% | **4.094 p-s** |
-| **1500** | OpenMP-Standard | 8 | 0.9360 s | 4.37x | 54.7% | 7.488 p-s |
-| **1500** | OpenMP-Blocked | 8 | **0.8470 s** | **4.83x** | **60.4%** | **6.776 p-s** |
-| **2000** | Sequential | 1 | 9.6350 s | 1.00x | 100.0% | **9.635 p-s** |
-| **2000** | OpenMP-Standard | 8 | 2.0260 s | 4.76x | 59.5% | 16.208 p-s |
-| **2000** | OpenMP-Blocked | 8 | **1.9690 s** | **4.89x** | **61.2%** | **15.752 p-s** |
+| **500** | Sequential | 1 | 0.1360 s | 1.00x | 100.0% | **0.136 p-s** |
+| **500** | OpenMP-Standard | 8 | 0.0820 s | 1.66x | 20.7% | 0.656 p-s |
+| **500** | OpenMP-Blocked | 8 | **0.0370 s** | **3.68x** | **46.0%** | **0.296 p-s** |
+| **1000** | Sequential | 1 | 1.1570 s | 1.00x | 100.0% | **1.157 p-s** |
+| **1000** | OpenMP-Standard | 8 | 0.4150 s | 2.79x | 34.9% | 3.320 p-s |
+| **1000** | OpenMP-Blocked | 8 | **0.2780 s** | **4.16x** | **52.0%** | **2.224 p-s** |
+| **1500** | Sequential | 1 | 4.0700 s | 1.00x | 100.0% | **4.070 p-s** |
+| **1500** | OpenMP-Standard | 8 | 1.0440 s | 3.90x | 48.7% | 8.352 p-s |
+| **1500** | OpenMP-Blocked | 8 | **0.8890 s** | **4.58x** | **57.2%** | **7.112 p-s** |
+| **2000** | Sequential | 1 | 9.6770 s | 1.00x | 100.0% | **9.677 p-s** |
+| **2000** | OpenMP-Standard | 8 | 2.4010 s | 4.03x | 50.4% | 19.208 p-s |
+| **2000** | OpenMP-Blocked | 8 | **2.1600 s** | **4.48x** | **56.0%** | **17.280 p-s** |
 
-Full results for 1/2/4/8 threads: [`benchmark_results.csv`](benchmark_results.csv). Block-size study: [`block_size_results.csv`](block_size_results.csv).
+Full results for 1/2/4/6/8/12 threads, including overhead and Karp-Flatt columns: [`benchmark_results.csv`](benchmark_results.csv). Block-size study: [`block_size_results.csv`](block_size_results.csv).
 
-> **Key Finding:** At $V = 2000$ (8 billion operations), runtime fell from **9.64s to 1.97s** (**4.89x speedup**, blocked, 8 threads). Blocking beat standard parallelization at every size, by 92% at $V = 500$ (mostly from needing $2V/B$ barriers instead of $V$) and about 3% at $V = 2000$. Block sizes $B = 32$–$64$ were fastest and $B = 256$ the slowest. Efficiency at 8 threads stays near 60% because the CPU has only 6 physical cores.
+> **Key Finding:** At $V = 2000$ (8 billion operations), runtime fell from **9.68s to 2.16s** on 8 threads (**4.48x**, blocked) and to **1.97s on 12 threads (4.91x)**. With 8 threads, blocking beat standard parallelization at every size: by 122% at $V = 500$ (mostly from needing $2V/B$ barriers instead of $V$), 49% at $V = 1000$, 17% at $V = 1500$ and 11% at $V = 2000$. $B = 64$ was the fastest block size, or within 1% of it, at every size.
 >
-> **Correctness:** 1,224 test runs (8 graph sizes incl. 1, 63, 64, 65 vertices × 3 densities × 3 seeds × every thread count and block size) match an independent Bellman-Ford oracle exactly.
+> **Parallel overhead:** $T_o = p \cdot T_p - T_{seq}$ and the Karp-Flatt serial fraction $e = \frac{1/\psi - 1/p}{1 - 1/p}$ are computed for every row. At $V = 2000$, $T_o$ grows from 4.1 s ($p = 2$) to 20.0 s ($p = 12$) for Standard OpenMP and from 3.9 s to 14.0 s for Blocked. Blocked has the lower $e$ in 19 of 20 cases, and $e$ rising from 8 to 12 threads shows overhead (barriers, Hyper-Threading contention) growing faster than useful work.
+>
+> **Correctness:** 1,800 test runs (8 graph sizes incl. 1, 63, 64, 65 vertices × 3 densities × 3 seeds × every thread count 1–12 and block size) match an independent Bellman-Ford oracle exactly.
 
 ---
 
@@ -121,7 +123,8 @@ Full results for 1/2/4/8 threads: [`benchmark_results.csv`](benchmark_results.cs
 </p>
 
 <p align="center">
-  <img src="block_size_analysis.png" width="60%" alt="Block Size Analysis" />
+  <img src="block_size_analysis.png" width="48%" alt="Block Size Analysis" />
+  <img src="overhead_analysis.png" width="48%" alt="Karp-Flatt Overhead Analysis" />
 </p>
 
 ---
@@ -137,7 +140,7 @@ Full results for 1/2/4/8 threads: [`benchmark_results.csv`](benchmark_results.cs
 # Compile benchmark harness with OpenMP and maximum optimization
 gcc -O3 -fopenmp main_benchmark.c -o benchmark.exe
 
-# Run correctness tests, attack-path demo and benchmarks (~5 min, rewrites both CSVs)
+# Run correctness tests, attack-path demo and benchmarks (~10 min, rewrites both CSVs)
 ./benchmark.exe
 
 # Only correctness tests + attack-path demo (~10 s)

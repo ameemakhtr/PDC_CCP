@@ -12,7 +12,12 @@
 
 #define INF 1000000000
 #define BLOCK_SIZE 64
-#define RUNS 3   // every timing is the median of RUNS runs
+#define RUNS 5   // every timing is the median of RUNS round-robin runs
+
+// Thread counts used everywhere: 6 = physical cores, 12 = all hardware threads (i7-9750H)
+static const int THREADS[] = {1, 2, 4, 6, 8, 12};
+#define NUM_THREADS 6
+#define NC (1 + 2 * NUM_THREADS + 5)  // timed configurations per graph size
 
 // Initialize graph with random weights and given edge density
 void initialize_graph(int *matrix, int n, double density, unsigned int seed) {
@@ -166,7 +171,6 @@ void apsp_bellman_ford(const int *g, int *d, int n) {
 void run_correctness_tests(void) {
     int sizes[] = {1, 2, 17, 63, 64, 65, 130, 300};
     double densities[] = {0.02, 0.40, 1.00};
-    int threads[] = {1, 2, 4, 8};
     int blocks[] = {16, 64, 128};
     int max_n = 300, tests = 0;
     size_t bytes = (size_t)max_n * max_n * sizeof(int);
@@ -180,16 +184,16 @@ void run_correctness_tests(void) {
         apsp_bellman_ford(g, ref, n);
 
         for (int algo = 0; algo < 3; algo++)
-        for (int t = 0; t < 4; t++) {
+        for (int t = 0; t < NUM_THREADS; t++) {
             if (algo == 0 && t > 0) break;      // sequential has no thread count
             for (int b = 0; b < 3; b++) {
                 if (algo != 2 && b > 0) break;  // only the blocked version uses B
                 memcpy(out, g, (size_t)n * n * sizeof(int));
-                run_algo(algo, out, n, threads[t], blocks[b]);
+                run_algo(algo, out, n, THREADS[t], blocks[b]);
                 tests++;
                 if (!verify_results(ref, out, n)) {
                     printf("  [FAIL] algo=%d n=%d density=%.2f seed=%u threads=%d B=%d\n",
-                           algo, n, densities[di], seed, threads[t], blocks[b]);
+                           algo, n, densities[di], seed, THREADS[t], blocks[b]);
                     exit(1); // ponytail: process ends here, OS frees memory
                 }
             }
@@ -253,33 +257,37 @@ static int cmp_double(const void *a, const void *b) {
     return (x > y) - (x < y);
 }
 
-// Median wall time of RUNS runs, each on a fresh copy of the graph.
-// If ref is given, every run's result must equal it (no fast-but-wrong timings).
-double time_algo(int algo, const int *base, int *work, const int *ref, int n, int threads, int bsize) {
-    double t[RUNS];
-    for (int r = 0; r < RUNS; r++) {
-        memcpy(work, base, (size_t)n * n * sizeof(int));
-        double start = omp_get_wtime();
-        run_algo(algo, work, n, threads, bsize);
-        t[r] = omp_get_wtime() - start;
-        if (ref && !verify_results(ref, work, n)) {
-            printf("  [FAIL] wrong result: algo=%d n=%d threads=%d B=%d\n", algo, n, threads, bsize);
-            exit(1);
-        }
+// One timed run on a fresh copy of the graph; the result must equal ref (no fast-but-wrong timings)
+double time_once(int algo, const int *base, int *work, const int *ref, int n, int threads, int bsize) {
+    memcpy(work, base, (size_t)n * n * sizeof(int));
+    double start = omp_get_wtime();
+    run_algo(algo, work, n, threads, bsize);
+    double t = omp_get_wtime() - start;
+    if (!verify_results(ref, work, n)) {
+        printf("  [FAIL] wrong result: algo=%d n=%d threads=%d B=%d\n", algo, n, threads, bsize);
+        exit(1);
     }
-    qsort(t, RUNS, sizeof(double), cmp_double);
-    return t[RUNS / 2];
+    return t;
 }
 
-// Print one result row and append it to the CSV
+double median(double *t, int k) {
+    qsort(t, k, sizeof(double), cmp_double);
+    return t[k / 2];
+}
+
+// Print one result row and append it to the CSV.
+// Parallel overhead  T_o = p * T_p - T_seq   (time spent not doing useful work)
+// Karp-Flatt metric  e   = (1/speedup - 1/p) / (1 - 1/p)   (measured serial fraction, p > 1)
 void report_row(FILE *csv, int n, const char *name, int th, double t, double t_seq) {
     double speedup = t_seq / t;
     double efficiency = (speedup / th) * 100.0;
+    double overhead = th * t - t_seq;
+    double karp_flatt = (th > 1) ? (1.0 / speedup - 1.0 / th) / (1.0 - 1.0 / th) : 0.0;
     char sp_buf[16], eff_buf[16];
     snprintf(sp_buf, sizeof(sp_buf), "%.2fx", speedup);
     snprintf(eff_buf, sizeof(eff_buf), "%.1f%%", efficiency);
-    printf("%-8d %-20s %-8d %-15.4f %-10s %-11s\n", n, name, th, t, sp_buf, eff_buf);
-    fprintf(csv, "%d,%s,%d,%.5f,%.4f,%.2f\n", n, name, th, t, speedup, efficiency);
+    printf("%-8d %-20s %-8d %-12.4f %-9s %-11s %-12.4f %.4f\n", n, name, th, t, sp_buf, eff_buf, overhead, karp_flatt);
+    fprintf(csv, "%d,%s,%d,%.5f,%.4f,%.2f,%.5f,%.4f\n", n, name, th, t, speedup, efficiency, overhead, karp_flatt);
 }
 
 int main(int argc, char *argv[]) {
@@ -299,7 +307,6 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && strcmp(argv[1], "--quick") == 0) return 0; // tests + demo only
 
     int sizes[] = {500, 1000, 1500, 2000};
-    int threads[] = {1, 2, 4, 8};
     int block_sizes[] = {16, 32, 64, 128, 256};
 
     FILE *f_csv = fopen("benchmark_results.csv", "w");
@@ -308,12 +315,12 @@ int main(int argc, char *argv[]) {
         perror("Failed to open CSV output");
         return 1;
     }
-    fprintf(f_csv, "Size,Implementation,Threads,ExecutionTime_Sec,Speedup,Efficiency_Pct\n");
+    fprintf(f_csv, "Size,Implementation,Threads,ExecutionTime_Sec,Speedup,Efficiency_Pct,Overhead_Sec,KarpFlatt\n");
     fprintf(f_blk, "Size,BlockSize,Threads,ExecutionTime_Sec,Speedup\n");
 
-    printf("[3/3] Scalability benchmarks (median of %d runs, every result verified)...\n", RUNS);
-    printf("%-8s %-20s %-8s %-15s %-10s %-12s\n", "Vertices", "Algorithm", "Threads", "Time (sec)", "Speedup", "Efficiency");
-    printf("------------------------------------------------------------------------------\n");
+    printf("[3/3] Scalability benchmarks (median of %d round-robin runs, every result verified)...\n", RUNS);
+    printf("%-8s %-20s %-8s %-12s %-9s %-11s %-12s %s\n", "Vertices", "Algorithm", "Threads", "Time (sec)", "Speedup", "Efficiency", "Overhead(s)", "Karp-Flatt");
+    printf("--------------------------------------------------------------------------------------------\n");
 
     for (int s = 0; s < 4; s++) {
         int n = sizes[s];
@@ -321,27 +328,37 @@ int main(int argc, char *argv[]) {
         int *base_graph = malloc(bytes), *work_graph = malloc(bytes), *ref = malloc(bytes);
         initialize_graph(base_graph, n, 0.40, 100 + s);
 
-        // Sequential baseline; its result becomes the reference for every parallel run
-        double t_seq = time_algo(0, base_graph, work_graph, NULL, n, 1, 0);
-        memcpy(ref, work_graph, bytes);
+        // Untimed sequential run: gives the reference result and warms up the CPU and caches
+        memcpy(ref, base_graph, bytes);
+        floyd_warshall_sequential(ref, n);
+
+        // Configurations in table order: sequential, standard x threads,
+        // blocked x threads, then the block-size study (8 threads, B varied)
+        int algo[NC], th[NC], bs[NC], c = 0;
+        algo[c] = 0; th[c] = 1; bs[c++] = 0;
+        for (int t = 0; t < NUM_THREADS; t++) { algo[c] = 1; th[c] = THREADS[t]; bs[c++] = 0; }
+        for (int t = 0; t < NUM_THREADS; t++) { algo[c] = 2; th[c] = THREADS[t]; bs[c++] = BLOCK_SIZE; }
+        for (int b = 0; b < 5; b++) { algo[c] = 2; th[c] = 8; bs[c++] = block_sizes[b]; }
+
+        // Round-robin: each round times every configuration once, so slow drift in CPU
+        // clock speed (turbo, temperature, power plan) affects all of them equally
+        double times[NC][RUNS], med[NC];
+        for (int r = 0; r < RUNS; r++)
+            for (int i = 0; i < NC; i++)
+                times[i][r] = time_once(algo[i], base_graph, work_graph, ref, n, th[i], bs[i]);
+        for (int i = 0; i < NC; i++) med[i] = median(times[i], RUNS);
+
+        double t_seq = med[0];
         report_row(f_csv, n, "Sequential", 1, t_seq, t_seq);
-
-        for (int t = 0; t < 4; t++)
-            report_row(f_csv, n, "OpenMP-Standard", threads[t],
-                       time_algo(1, base_graph, work_graph, ref, n, threads[t], 0), t_seq);
-        for (int t = 0; t < 4; t++)
-            report_row(f_csv, n, "OpenMP-Blocked", threads[t],
-                       time_algo(2, base_graph, work_graph, ref, n, threads[t], BLOCK_SIZE), t_seq);
-
-        // Block-size study: same graph, 8 threads, B varied
-        for (int b = 0; b < 5; b++) {
-            double t_blk = time_algo(2, base_graph, work_graph, ref, n, 8, block_sizes[b]);
+        for (int i = 1; i < NC - 5; i++)
+            report_row(f_csv, n, algo[i] == 1 ? "OpenMP-Standard" : "OpenMP-Blocked", th[i], med[i], t_seq);
+        for (int i = NC - 5; i < NC; i++) {
             char label[24];
-            snprintf(label, sizeof(label), "Blocked B=%d", block_sizes[b]);
-            printf("%-8d %-20s %-8d %-15.4f %.2fx\n", n, label, 8, t_blk, t_seq / t_blk);
-            fprintf(f_blk, "%d,%d,8,%.5f,%.4f\n", n, block_sizes[b], t_blk, t_seq / t_blk);
+            snprintf(label, sizeof(label), "Blocked B=%d", bs[i]);
+            printf("%-8d %-20s %-8d %-12.4f %.2fx\n", n, label, 8, med[i], t_seq / med[i]);
+            fprintf(f_blk, "%d,%d,8,%.5f,%.4f\n", n, bs[i], med[i], t_seq / med[i]);
         }
-        printf("------------------------------------------------------------------------------\n");
+        printf("--------------------------------------------------------------------------------------------\n");
 
         free(base_graph);
         free(work_graph);

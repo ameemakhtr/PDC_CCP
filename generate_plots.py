@@ -53,7 +53,7 @@ print("Generated runtime_comparison.png")
 
 # Plot 2: Speedup vs Thread Count
 plt.figure(figsize=(8, 5), dpi=300)
-threads = [1, 2, 4, 8]
+threads = sorted(df['Threads'].unique())
 plt.plot(threads, threads, 'k--', label='Ideal Linear Speedup ($S = p$)', alpha=0.7)
 
 for size in [500, 1000, 1500, 2000]:
@@ -131,3 +131,21 @@ plt.tight_layout()
 plt.savefig('block_size_analysis.png')
 plt.close()
 print("Generated block_size_analysis.png")
+
+# Plot 6: Karp-Flatt serial fraction e vs threads (rising e = growing parallel overhead)
+plt.figure(figsize=(8, 5), dpi=300)
+for i, size in enumerate(sizes):
+    for impl, style in (('OpenMP-Standard', '-'), ('OpenMP-Blocked', '--')):
+        sub = df[(df['Size'] == size) & (df['Implementation'] == impl) & (df['Threads'] > 1)]
+        plt.plot(sub['Threads'], sub['KarpFlatt'], marker='o', linestyle=style, color=f'C{i}',
+                 label=f'V = {size} ({impl.split("-")[1]})')
+plt.title(r'Karp-Flatt Serial Fraction $e = (1/\psi - 1/p)/(1 - 1/p)$', fontweight='bold', pad=12)
+plt.xlabel('Number of Threads (p)')
+plt.ylabel('Experimentally determined serial fraction e')
+plt.xticks([t for t in threads if t > 1])
+plt.grid(True, linestyle='--', alpha=0.6)
+plt.legend(frameon=True, facecolor='#f8f9fa', framealpha=0.9, fontsize=8, ncol=2)
+plt.tight_layout()
+plt.savefig('overhead_analysis.png')
+plt.close()
+print("Generated overhead_analysis.png")
