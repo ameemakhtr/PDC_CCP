@@ -335,7 +335,7 @@ def create_docx_report():
     p_cyber_intro.add_run("In modern cybersecurity infrastructure, rapid shortest path computations enable critical defensive workflows:")
 
     # BULLET POINTS ON NEW LINES
-    add_bullet_item(doc, "Attack Path Enumeration:", "Network assets (workstations, DMZ gateways, AD domain controllers) are mapped as vertices. Edges represent exploitable communication channels with weights inverse to vulnerability risk (e.g., w = 10 - CVSS). APSP calculates the exact minimal-effort exploit path an adversary would traverse to reach crown-jewel assets.")
+    add_bullet_item(doc, "Attack Path Enumeration:", "Network assets (workstations, DMZ gateways, AD domain controllers) are mapped as vertices. Edges represent exploitable communication channels with weights expressing attacker effort (lower = easier to exploit). APSP calculates the exact minimal-effort exploit path an adversary would traverse to reach crown-jewel assets.")
     add_bullet_item(doc, "Blast Radius Analysis:", "When an endpoint is compromised by ransomware, APSP immediately reveals all subnets and resources within reachable lateral propagation thresholds, allowing instant automated quarantine.")
     add_bullet_item(doc, "Zero-Trust Segmentation:", "Centrality and shortest-path frequency identify critical bridge nodes where firewalls, Intrusion Prevention Systems (IPS), and EDR telemetry must be prioritized.")
 
@@ -518,7 +518,7 @@ def create_docx_report():
     p_sim_exp.paragraph_format.line_spacing = 1.15
     p_sim_exp.paragraph_format.space_after = Pt(6)
     p_sim_exp.add_run(
-        "Empirical benchmarks were conducted on an Intel Core i7-9750H (6 cores / 12 hardware threads, 32 KB L1D + 256 KB L2 per core, 12 MB shared L3) using GCC 16.2.0 (-O3 -fopenmp). Each time is the median of 5 runs, taken round-robin (every configuration once per round) so CPU clock drift affects all of them equally, and every parallel result was verified against the sequential output. In strict alignment with CS-428 Lab 4 (Performance Analysis of Real OpenMP Applications), the parallel solutions were evaluated across three foundational performance metrics:\n"
+        "Empirical benchmarks were conducted on an Intel Core i7-9750H (6 cores / 12 hardware threads, 32 KB L1D + 256 KB L2 per core, 12 MB shared L3) using GCC 16.2.0 (-O3 -fopenmp). Each time is the median of 5 runs, taken round-robin (every configuration once per round) so CPU clock drift affects all of them equally, and every parallel result was verified against the sequential output. Each graph size uses one random graph (fixed seed, edge density 0.40); no spread across graphs or runs is reported, and repeated runs differed by up to about 10%. In strict alignment with CS-428 Lab 4 (Performance Analysis of Real OpenMP Applications), the parallel solutions were evaluated across three foundational performance metrics:\n"
         "• Speedup ψ(n, p) = T_seq / T_p: Relative performance compared to the sequential baseline.\n"
         "• Efficiency ε(n, p) = ψ(n, p) / p * 100%: Percentage of time each hardware thread is usefully utilized.\n"
         "• Parallel Cost c(n, p) = p * T_p: Resource expenditure in processor-seconds, demonstrating cost-optimality when c(n, p) approaches sequential time."
@@ -625,9 +625,9 @@ def create_docx_report():
     p_con_intro.add_run("This project successfully designed, implemented, and empirically evaluated parallel optimizations for the Floyd-Warshall All-Pairs Shortest Path algorithm. On moderate to large graph sizes, shared-memory multi-threading delivered marked performance gains over single-threaded sequential execution:")
 
     # BULLETS ON NEW LINES
-    add_bullet_item(doc, "Standard OpenMP:", "Reached 4.03x speedup on 8 threads at V = 2000 (2.401s vs 9.677s sequential) and 2.79x at V = 1000 (0.415s vs 1.157s). Going from 8 to 12 threads changed its speedup by only -0.11x to +0.33x.")
+    add_bullet_item(doc, "Standard OpenMP:", "Reached 4.03x speedup on 8 threads at V = 2000 (2.401s vs 9.677s sequential) and 2.79x at V = 1000 (0.415s vs 1.157s).")
     add_bullet_item(doc, "Cache-Blocked OpenMP:", "Reached 4.48x speedup on 8 threads and 4.91x on 12 threads at V = 2000 (1.969s), and 4.16x at V = 1000 (0.278s, 8 threads). With 8 threads, blocking beat standard parallelization at every size: by 122% at V = 500, 49% at V = 1000, 17% at V = 1500 and 11% at V = 2000. B = 64 was the fastest block size, or within 1% of it, at every size.")
-    add_bullet_item(doc, "Parallel Overhead:", "With 1 thread, both OpenMP versions run within +/-10% of the sequential code (0.91-1.07x), so thread start-up overhead is small. The blocked version's large gain at V = 500 (2.2x) comes mostly from needing 2V/B barriers instead of V.")
+    add_bullet_item(doc, "Parallel Overhead:", "With 1 thread, both OpenMP versions do the same work as the sequential code yet measured 0.91-1.07x: this +/-10% spread is run-to-run noise on this laptop, so differences below about 10% (such as the 11% blocked gain at V = 2000, which was 3% in an earlier run) are not significant. The blocked version's large gain at V = 500 (2.2x) comes mostly from needing 2V/B barriers instead of V.")
 
     p_c2_h = doc.add_paragraph()
     p_c2_h.paragraph_format.space_before = Pt(6)
@@ -644,7 +644,7 @@ def create_docx_report():
     # NUMBERED ITEMS ON NEW LINES
     add_num_item(doc, "1.", "Thread Synchronization Barriers:", "Because iteration k strictly requires the completed state of iteration k-1, an implicit barrier synchronization occurs at the end of every k phase (2000 total barriers for V=2000). Thread fork-join overhead and scheduling jitter accumulate across iterations.")
     add_num_item(doc, "2.", "Memory Bandwidth Saturation:", "The standard algorithm possesses low arithmetic intensity (~0.17 ops/byte). When multiple threads concurrently stream non-contiguous column elements from main RAM, the shared multi-core memory bus saturates, creating memory stall cycles.")
-    add_num_item(doc, "3.", "Physical Core Limit:", "The i7-9750H has 6 physical cores. Threads 7-12 run on the same cores through Hyper-Threading and share their execution units and L1/L2 caches. From 8 to 12 threads, Standard OpenMP changed by -0.11x to +0.33x speedup, while the cache-friendly Blocked version still gained 0.21x to 0.98x.")
+    add_num_item(doc, "3.", "Physical Core Limit:", "The i7-9750H has 6 physical cores. Threads 7-12 run on the same cores through Hyper-Threading and share their execution units and L1/L2 caches. From 8 to 12 threads, the cache-friendly Blocked version got faster at every size (+6% to +21%) while Standard OpenMP changed by -3% to +12%; single differences near 10% are within noise.")
 
     p_oh_h = doc.add_paragraph()
     p_oh_h.paragraph_format.space_before = Pt(6)
@@ -655,7 +655,7 @@ def create_docx_report():
     p_oh = doc.add_paragraph()
     p_oh.paragraph_format.line_spacing = 1.15
     p_oh.paragraph_format.space_after = Pt(4)
-    p_oh.add_run("Parallel overhead is the total thread-time not spent on useful work, T_o = p*T_p - T_seq, and the Karp-Flatt metric e = (1/speedup - 1/p) / (1 - 1/p) estimates the effective serial fraction from the measured speedup. With 1 thread, T_o is within +/-10% of T_seq (measurement noise), so thread start-up is cheap. T_o then grows with p: at V = 2000 Standard OpenMP wastes 4.1 s of thread-time at p = 2 and 20.0 s at p = 12, the Blocked version 3.9 s and 14.0 s. The Blocked version has the lower e in 19 of the 20 cases below. In 6 of 8 cases e rises from 8 to 12 threads: overhead (barriers and Hyper-Threading contention) grows faster than useful work, rather than a fixed serial part limiting speedup. e is highest at V = 500, where each barrier guards only 250,000 cell updates.")
+    p_oh.add_run("Parallel overhead is the total thread-time not spent on useful work, T_o = p*T_p - T_seq, and the Karp-Flatt metric e = (1/speedup - 1/p) / (1 - 1/p) estimates the effective serial fraction from the measured speedup. At 1 thread, T_o (-0.35 to +0.01 s) is measurement noise, since the work equals the sequential code. T_o then grows with p: at V = 2000 Standard OpenMP wastes 4.1 s of thread-time at p = 2 and 20.0 s at p = 12, the Blocked version 3.9 s and 14.0 s. The Blocked version has the lower e in 19 of the 20 cases below. In 6 of 8 cases e rises from 8 to 12 threads: overhead (barriers and Hyper-Threading contention) grows faster than useful work, rather than a fixed serial part limiting speedup. e is highest at V = 500, where each barrier guards only 250,000 cell updates.")
 
     # Karp-Flatt serial fraction e per thread count, read from benchmark_results.csv
     with open('benchmark_results.csv') as f:
@@ -724,7 +724,7 @@ def create_docx_report():
 
     # BULLETS ON NEW LINES
     add_bullet_item(doc, "Network Assets:", "Phished-PC, Web-DMZ, VPN-Gateway, HR-Workstation, File-Server, SQL-Database, Jump-Host and Domain-Controller. Nine directed edges model exploitable channels (reused password, SQL injection, open SMB share, stored RDP credentials, admin session).")
-    add_bullet_item(doc, "Edge Weights:", "Each weight is the attacker effort to pivot (lower = easier), e.g. W(u, v) = 10 - CVSS_Exploitability.")
+    add_bullet_item(doc, "Edge Weights:", "Each weight is the attacker effort to pivot (lower = easier), using illustrative values from 2 to 12 inspired by CVSS exploitability scoring (not computed from real CVSS vectors).")
     add_bullet_item(doc, "Result:", "Minimum-effort path Phished-PC -> HR-Workstation -> File-Server -> Jump-Host -> Domain-Controller (effort 11), cheaper than the direct HR-Workstation -> Domain-Controller route (14) and the Web-DMZ -> SQL-Database route (18). Blast radius within effort 7: HR-Workstation (2), File-Server (5), Web-DMZ (6), Jump-Host (7). The program checks this against the hand-computed answer and fails if it differs.")
 
     p_add_sub2 = doc.add_paragraph()

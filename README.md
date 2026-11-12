@@ -27,8 +27,7 @@ This project investigates the multi-core parallelization and memory hierarchy op
 ## 🛡️ Cybersecurity Domain Application
 
 In modern cyber defense, rapid all-pairs shortest path computation is critical for:
-- **Attack Graph Analysis & Reachability:** Enterprise network assets (workstations, DMZ proxies, Active Directory Domain Controllers) are mapped as vertices. Edges represent exploitable communication channels with weights mapped via CVSS v3.1 metrics:
-  $$W(u, v) = 10 - \text{CVSS}_{\text{Exploitability}}$$
+- **Attack Graph Analysis & Reachability:** Enterprise network assets (workstations, DMZ proxies, Active Directory Domain Controllers) are mapped as vertices. Edges represent exploitable communication channels with weights expressing attacker effort (lower = easier). The demo uses illustrative effort values (2–12) inspired by CVSS exploitability scoring, not real CVSS vectors.
   The parallel solver computes the **Minimum-Effort Attack Trajectory** from perimeter phished hosts to domain root credentials. This is implemented as step [2/3] of `main_benchmark.c` on an 8-node network:
   ```
   Minimum-effort attack path (effort 11):
@@ -80,7 +79,7 @@ Partitions the $N \times N$ matrix into $B \times B$ blocks ($B = 64$). For each
 
 ## 📊 Empirical Simulation Results
 
-Evaluated on an Intel Core i7-9750H (6 cores / 12 hardware threads) using GCC 16.2.0 (`-O3 -fopenmp`) across random directed graphs ($p = 0.40$). Every time is the **median of 5 round-robin runs** (each round times every configuration once, so CPU clock drift hits all of them equally), and every parallel result is checked against the sequential output. Metrics strictly conform to **NED CS-428 Lab 4**:
+Evaluated on an Intel Core i7-9750H (6 cores / 12 hardware threads) using GCC 16.2.0 (`-O3 -fopenmp`) across random directed graphs ($p = 0.40$). Every time is the **median of 5 round-robin runs** (each round times every configuration once, so CPU clock drift hits all of them equally), and every parallel result is checked against the sequential output. Each graph size uses one random graph (fixed seed, edge density 0.40); no spread across graphs or runs is reported, and repeated runs differed by up to about 10%. Metrics strictly conform to **NED CS-428 Lab 4**:
 - **Speedup:** $\psi(n, p) = \frac{T_{seq}}{T_p}$
 - **Efficiency:** $\varepsilon(n, p) = \frac{\psi(n, p)}{p} \times 100\%$
 - **Parallel Cost:** $c(n, p) = p \times T_p$ (processor-seconds)
@@ -102,7 +101,7 @@ Evaluated on an Intel Core i7-9750H (6 cores / 12 hardware threads) using GCC 16
 
 Full results for 1/2/4/6/8/12 threads, including overhead and Karp-Flatt columns: [`benchmark_results.csv`](benchmark_results.csv). Block-size study: [`block_size_results.csv`](block_size_results.csv).
 
-> **Key Finding:** At $V = 2000$ (8 billion operations), runtime fell from **9.68s to 2.16s** on 8 threads (**4.48x**, blocked) and to **1.97s on 12 threads (4.91x)**. With 8 threads, blocking beat standard parallelization at every size: by 122% at $V = 500$ (mostly from needing $2V/B$ barriers instead of $V$), 49% at $V = 1000$, 17% at $V = 1500$ and 11% at $V = 2000$. $B = 64$ was the fastest block size, or within 1% of it, at every size.
+> **Key Finding:** At $V = 2000$ (8 billion operations), runtime fell from **9.68s to 2.16s** on 8 threads (**4.48x**, blocked) and to **1.97s on 12 threads (4.91x)**. With 8 threads, blocking beat standard parallelization at every size: by 122% at $V = 500$ (mostly from needing $2V/B$ barriers instead of $V$), 49% at $V = 1000$, 17% at $V = 1500$ and 11% at $V = 2000$. Differences below ~10% are within run-to-run noise: 1-thread runs, which do the same work as sequential, measured 0.91–1.07x (the V = 2000 gain was 3% in an earlier run). $B = 64$ was the fastest block size, or within 1% of it, at every size.
 >
 > **Parallel overhead:** $T_o = p \cdot T_p - T_{seq}$ and the Karp-Flatt serial fraction $e = \frac{1/\psi - 1/p}{1 - 1/p}$ are computed for every row. At $V = 2000$, $T_o$ grows from 4.1 s ($p = 2$) to 20.0 s ($p = 12$) for Standard OpenMP and from 3.9 s to 14.0 s for Blocked. Blocked has the lower $e$ in 19 of 20 cases, and $e$ rising from 8 to 12 threads shows overhead (barriers, Hyper-Threading contention) growing faster than useful work.
 >
@@ -146,6 +145,8 @@ gcc -O3 -fopenmp main_benchmark.c -o benchmark.exe
 # Only correctness tests + attack-path demo (~10 s)
 ./benchmark.exe --quick
 ```
+
+`floyd_sequential.c`, `floyd_parallel.c` and `floyd_blocked.c` are reference copies of the three algorithms for reading. They have no `main`; build only `main_benchmark.c` (compiling `*.c` together fails with duplicate definitions).
 
 ### Regenerate Plots & Reports
 ```bash

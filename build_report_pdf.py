@@ -294,7 +294,7 @@ def generate_pdf():
     ))
     # SEPARATE BULLETS ON NEW LINES WITH PROPER INDENTATION
     story.append(Paragraph(
-        "&bull; <b>Attack Path Enumeration:</b> Network assets (workstations, DMZ gateways, AD domain controllers) are mapped as vertices. Edges represent exploitable communication channels with weights inverse to vulnerability risk (e.g., <i>w</i> = 10 - CVSS). APSP calculates the exact minimal-effort exploit path an adversary would traverse to reach crown-jewel assets.",
+        "&bull; <b>Attack Path Enumeration:</b> Network assets (workstations, DMZ gateways, AD domain controllers) are mapped as vertices. Edges represent exploitable communication channels with weights expressing attacker effort (lower = easier to exploit). APSP calculates the exact minimal-effort exploit path an adversary would traverse to reach crown-jewel assets.",
         bullet_style
     ))
     story.append(Paragraph(
@@ -436,7 +436,7 @@ def generate_pdf():
     story.append(Spacer(1, 10))
     story.append(Paragraph("Simulation Results:", section_heading))
     story.append(Paragraph(
-        "Empirical benchmarks were conducted on an Intel Core i7-9750H (6 cores / 12 hardware threads, 32 KB L1D + 256 KB L2 per core, 12 MB shared L3) using GCC 16.2.0 (<font face='Courier'>-O3 -fopenmp</font>). Each time is the median of 5 runs, taken round-robin (every configuration once per round) so CPU clock drift affects all of them equally, and every parallel result was verified against the sequential output. In strict conformance with <b>CS-428 Lab 4 (Performance Analysis of Real OpenMP Applications)</b>, performance is analyzed across Speedup &psi;(<i>n, p</i>), Efficiency &epsilon;(<i>n, p</i>), and Parallel Cost <i>c(n, p) = p &times; T<sub>p</sub></i> (processor-seconds):",
+        "Empirical benchmarks were conducted on an Intel Core i7-9750H (6 cores / 12 hardware threads, 32 KB L1D + 256 KB L2 per core, 12 MB shared L3) using GCC 16.2.0 (<font face='Courier'>-O3 -fopenmp</font>). Each time is the median of 5 runs, taken round-robin (every configuration once per round) so CPU clock drift affects all of them equally, and every parallel result was verified against the sequential output. Each graph size uses one random graph (fixed seed, edge density 0.40); no spread across graphs or runs is reported, and repeated runs differed by up to about 10%. In strict conformance with <b>CS-428 Lab 4 (Performance Analysis of Real OpenMP Applications)</b>, performance is analyzed across Speedup &psi;(<i>n, p</i>), Efficiency &epsilon;(<i>n, p</i>), and Parallel Cost <i>c(n, p) = p &times; T<sub>p</sub></i> (processor-seconds):",
         body_style
     ))
 
@@ -486,7 +486,7 @@ def generate_pdf():
 
     story.append(Spacer(1, 4))
     story.append(Paragraph(
-        "<b>Performance Analysis:</b> Both parallel versions scale with graph size: at 8 threads the Standard OpenMP speedup rises from 1.66x (<i>V</i> = 500) to 4.03x (<i>V</i> = 2000), because larger graphs give each thread more work per synchronization barrier. The Cache-Blocked version is faster at every size, but its advantage falls from 2.2x at <i>V</i> = 500 to 11% at <i>V</i> = 2000: on small graphs it wins mainly by replacing <i>V</i> barriers with 2<i>V</i>/<i>B</i> barriers, while on large graphs both versions are limited by memory bandwidth and by the 6 physical cores. With 1 thread, both OpenMP versions run within &plusmn;10% of the sequential code (0.91-1.07x), so thread start-up overhead is small.",
+        "<b>Performance Analysis:</b> Both parallel versions scale with graph size: at 8 threads the Standard OpenMP speedup rises from 1.66x (<i>V</i> = 500) to 4.03x (<i>V</i> = 2000), because larger graphs give each thread more work per synchronization barrier. The Cache-Blocked version is faster at every size, but its advantage falls from 2.2x at <i>V</i> = 500 to 11% at <i>V</i> = 2000: on small graphs it wins mainly by replacing <i>V</i> barriers with 2<i>V</i>/<i>B</i> barriers, while on large graphs both versions are limited by memory bandwidth and by the 6 physical cores. With 1 thread, both OpenMP versions do the same work as the sequential code yet measured 0.91-1.07x: this &plusmn;10% spread is run-to-run noise on this laptop, so differences below about 10% (such as the 11% blocked gain at <i>V</i> = 2000, which was 3% in an earlier run) are not significant.",
         body_style
     ))
     story.append(PageBreak())
@@ -503,7 +503,7 @@ def generate_pdf():
     ))
     # SEPARATE BULLETS ON NEW LINES WITH PROPER INDENTATION
     story.append(Paragraph(
-        "&bull; <b>Standard OpenMP:</b> Reached <b>4.03x speedup</b> on 8 threads at <i>V</i> = 2000 (2.401s vs 9.677s sequential) and <b>2.79x</b> at <i>V</i> = 1000 (0.415s vs 1.157s). Going from 8 to 12 threads changed its speedup by only -0.11x to +0.33x.",
+        "&bull; <b>Standard OpenMP:</b> Reached <b>4.03x speedup</b> on 8 threads at <i>V</i> = 2000 (2.401s vs 9.677s sequential) and <b>2.79x</b> at <i>V</i> = 1000 (0.415s vs 1.157s).",
         bullet_style
     ))
     story.append(Paragraph(
@@ -523,17 +523,17 @@ def generate_pdf():
         numbered_style
     ))
     story.append(Paragraph(
-        "<b>2. Memory Bandwidth Saturation:</b> The naive algorithm possesses an arithmetic intensity of ~0.17 FLOPs/byte. Multiple cores streaming non-contiguous column elements from main RAM saturate memory channels, causing CPU stall cycles.",
+        "<b>2. Memory Bandwidth Saturation:</b> The naive algorithm possesses an arithmetic intensity of ~0.17 integer ops/byte. Multiple cores streaming non-contiguous column elements from main RAM saturate memory channels, causing CPU stall cycles.",
         numbered_style
     ))
     story.append(Paragraph(
-        "<b>3. Physical Core Limit:</b> The i7-9750H has 6 physical cores. Threads 7-12 run on the same cores through Hyper-Threading and share their execution units and L1/L2 caches. From 8 to 12 threads, Standard OpenMP changed by -0.11x to +0.33x speedup, while the cache-friendly Blocked version still gained 0.21x to 0.98x.",
+        "<b>3. Physical Core Limit:</b> The i7-9750H has 6 physical cores. Threads 7-12 run on the same cores through Hyper-Threading and share their execution units and L1/L2 caches. From 8 to 12 threads, the cache-friendly Blocked version got faster at every size (+6% to +21%) while Standard OpenMP changed by -3% to +12%; single differences near 10% are within noise.",
         numbered_style
     ))
     story.append(Spacer(1, 4))
 
     story.append(Paragraph("<b>Parallel Overhead and Karp-Flatt Analysis:</b>", sub_heading))
-    story.append(Paragraph("<i>T<sub>o</sub> = p&middot;T<sub>p</sub> - T<sub>seq</sub></i> is the total thread-time not spent on useful work, and the Karp-Flatt metric <i>e = (1/&psi; - 1/p) / (1 - 1/p)</i> estimates the effective serial fraction. At 1 thread <i>T<sub>o</sub></i> is within &plusmn;10% of <i>T<sub>seq</sub></i>, so thread start-up is cheap. At <i>V</i> = 2000, <i>T<sub>o</sub></i> grows from 4.1 s (<i>p</i> = 2) to 20.0 s (<i>p</i> = 12) for Standard OpenMP and from 3.9 s to 14.0 s for Blocked. Blocked has the lower <i>e</i> in 19 of 20 cases, and in 6 of 8 cases <i>e</i> rises from 8 to 12 threads: overhead (barriers, Hyper-Threading contention) grows faster than useful work.", body_style))
+    story.append(Paragraph("<i>T<sub>o</sub> = p&middot;T<sub>p</sub> - T<sub>seq</sub></i> is the total thread-time not spent on useful work, and the Karp-Flatt metric <i>e = (1/&psi; - 1/p) / (1 - 1/p)</i> estimates the effective serial fraction. At 1 thread, <i>T<sub>o</sub></i> (-0.35 to +0.01 s) is measurement noise, since the work equals the sequential code. At <i>V</i> = 2000, <i>T<sub>o</sub></i> grows from 4.1 s (<i>p</i> = 2) to 20.0 s (<i>p</i> = 12) for Standard OpenMP and from 3.9 s to 14.0 s for Blocked. Blocked has the lower <i>e</i> in 19 of 20 cases, and in 6 of 8 cases <i>e</i> rises from 8 to 12 threads: overhead (barriers, Hyper-Threading contention) grows faster than useful work.", body_style))
     # Karp-Flatt serial fraction e per thread count, read from benchmark_results.csv
     with open('benchmark_results.csv') as f:
         bench = list(csv.DictReader(f))
@@ -582,7 +582,7 @@ def generate_pdf():
         bullet_style
     ))
     story.append(Paragraph(
-        "&bull; <b>Edge Weights:</b> Each weight is the attacker effort to pivot (lower = easier), e.g. <i>W(u, v) = 10 - CVSS_Exploitability</i>.",
+        "&bull; <b>Edge Weights:</b> Each weight is the attacker effort to pivot (lower = easier), using illustrative values from 2 to 12 inspired by CVSS exploitability scoring (not computed from real CVSS vectors).",
         bullet_style
     ))
     story.append(Paragraph(

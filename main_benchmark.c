@@ -204,7 +204,7 @@ void run_correctness_tests(void) {
 }
 
 // Cybersecurity demo: minimum-effort attack path on a small enterprise network.
-// Edge weight = attacker effort to pivot u -> v (lower = easier, e.g. 10 - CVSS exploitability).
+// Edge weight = attacker effort to pivot u -> v (lower = easier; illustrative values inspired by CVSS exploitability).
 #define NODES 8
 int attack_path_demo(void) {
     const char *name[NODES] = {"Phished-PC", "Web-DMZ", "VPN-Gateway", "HR-Workstation",

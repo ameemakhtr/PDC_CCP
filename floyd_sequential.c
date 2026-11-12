@@ -1,5 +1,6 @@
 /**
  * Sequential Floyd-Warshall All-Pairs Shortest Path (APSP)
+ * Reference copy for reading only: the compiled and benchmarked version is in main_benchmark.c.
  * Course: Parallel and Distributed Computing (PDC)
  * Department: Computer and Information Systems Engineering, NED University
  */
